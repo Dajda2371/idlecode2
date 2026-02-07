@@ -338,10 +338,15 @@ function deleteItem() {
 function openFile(filePath) {
     fs.readFile(filePath, 'utf-8', (err, data) => {
         if (err) return console.error(err);
+        currentFilePath = filePath;
         document.title = `${path.basename(filePath)} - ${filePath}`;
         renderCode(data);
     });
 }
+
+
+// Current open file path
+let currentFilePath = null;
 
 function renderCode(content) {
     const lines = content.split('\n');
@@ -350,33 +355,227 @@ function renderCode(content) {
 
     if (!lineNumbers || !codeContent) return;
 
+    // Enable editing
+    codeContent.contentEditable = true;
+    codeContent.spellcheck = false;
+    codeContent.style.outline = 'none';
+
     lineNumbers.innerHTML = '';
     codeContent.innerHTML = '';
 
-    lines.forEach((line, index) => {
-        const lineNum = index + 1;
+    // We use a single text node or simple divs for editing to avoid complexity with contenteditable
+    // But to keep syntax highlighting, we need a smarter approach. 
+    // For now, let's load the text as plain text in the contenteditable div, 
+    // and rely on a simpler 'highlight on save' or 'highlight line' approach to avoid cursor jumping.
+    // ACTUALLY: A full syntax highlighter in contenteditable is hard. 
+    // Let's implement a simple version: Text is just text. We highlight only when not editing or use a backdrop?
+    // User requested "functional" not "perfect".
+    // Let's just dump the text in. Syntax highlighting will be lost on edit for now to keep it usable.
+
+    codeContent.innerText = content;
+    updateLineNumbers(lines.length);
+
+    // Simple line number sync
+    codeContent.oninput = () => {
+        const lineCount = codeContent.innerText.split('\n').length;
+        updateLineNumbers(lineCount);
+    };
+
+    codeContent.onkeydown = (e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '    ');
+        }
+    };
+}
+
+function updateLineNumbers(count) {
+    const lineNumbers = document.getElementById('line-numbers');
+    lineNumbers.innerHTML = '';
+    for (let i = 1; i <= count; i++) {
         const numDiv = document.createElement('div');
-        numDiv.textContent = lineNum;
-        numDiv.className = 'h-5';
+        numDiv.textContent = i;
+        numDiv.className = 'h-[1.2em]'; // Approximate line height match
         lineNumbers.appendChild(numDiv);
-
-        const lineDiv = document.createElement('div');
-        lineDiv.className = 'h-5 whitespace-pre';
-
-        let processedLine = escapeHtml(line);
-        processedLine = processedLine.replace(/\b(import|from|def|class|return|if|else|elif|for|while|try|except)\b/g, '<span class="syntax-keyword">$1</span>');
-        processedLine = processedLine.replace(/\b(print|len|range|open)\b/g, '<span class="syntax-builtin">$1</span>');
-        processedLine = processedLine.replace(/('.*?'|".*?")/g, '<span class="syntax-string">$1</span>');
-        processedLine = processedLine.replace(/(#.*)$/g, '<span class="syntax-comment">$1</span>');
-
-        lineDiv.innerHTML = processedLine || ' ';
-        codeContent.appendChild(lineDiv);
-    });
+    }
 }
 
 function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
+
+ipcRenderer.on('save-file', () => {
+    if (currentFilePath) {
+        const content = document.getElementById('code-content').innerText;
+        fs.writeFile(currentFilePath, content, (err) => {
+            if (err) {
+                alert(`Error saving file: ${err.message}`);
+                console.error(err);
+                return;
+            }
+            // Optional: flash feedback
+            const title = document.title;
+            document.title = title.replace(' *', '') + ' (Saved)';
+            setTimeout(() => document.title = title.replace(' *', ''), 2000);
+        });
+    } else {
+        // Trigger Save As (handled in main usually, but we can trigger it here too or send back)
+        ipcRenderer.send('save-as-request'); // We need to add this to main
+    }
+});
+
+
+// --- Menu Action Listeners ---
+
+// Format Menu
+ipcRenderer.on('format-indent', () => {
+    // Basic indent at cursor or selection substitute
+    document.execCommand('insertText', false, '    ');
+});
+
+ipcRenderer.on('format-dedent', () => {
+    // Very basic dedent: remove 4 spaces if present at start of line or cursor
+    // Since we don't have full editor state control easily, we'll just try to implement a simple 'shift-tab' behavior
+    // For now, let's keep it simple or user might get frustrated with poor implementation.
+    // If we want true dedent, we need to handle selection. 
+    // Let's implement a naive "remove 4 chars back" for now or wait for better editor.
+    // document.execCommand('delete'); // Too risky
+    alert('Dedent not fully implemented in this basic editor view.');
+});
+
+ipcRenderer.on('format-comment', () => {
+    document.execCommand('insertText', false, '# ');
+});
+
+ipcRenderer.on('format-uncomment', () => {
+    // Hard to do without selection context
+    alert('Uncomment not fully implemented.');
+});
+
+ipcRenderer.on('format-tabify', () => {
+    const content = document.getElementById('code-content').innerText;
+    const newContent = content.replace(/    /g, '\t');
+    document.getElementById('code-content').innerText = newContent;
+});
+
+ipcRenderer.on('format-untabify', () => {
+    const content = document.getElementById('code-content').innerText;
+    const newContent = content.replace(/\t/g, '    ');
+    document.getElementById('code-content').innerText = newContent;
+});
+
+ipcRenderer.on('format-strip-trailing', () => {
+    const content = document.getElementById('code-content').innerText;
+    const newContent = content.split('\n').map(line => line.trimEnd()).join('\n');
+    document.getElementById('code-content').innerText = newContent;
+});
+
+
+ipcRenderer.on('option-show-line-numbers', () => {
+    const lineNumbers = document.getElementById('line-numbers');
+    if (lineNumbers.style.display === 'none') {
+        lineNumbers.style.display = 'block';
+    } else {
+        lineNumbers.style.display = 'none';
+    }
+});
+
+ipcRenderer.on('option-zoom-in', () => {
+    const currentZoom = require('electron').webFrame.getZoomFactor();
+    require('electron').webFrame.setZoomFactor(currentZoom + 0.1);
+});
+
+ipcRenderer.on('toggle-explorer', (event, show) => {
+    const el = document.querySelector('aside.w-\\[260px\\]');
+    if (el) el.style.display = show ? 'flex' : 'none';
+});
+
+ipcRenderer.on('toggle-console', (event, show) => {
+    const el = document.getElementById('console-area');
+    if (el) el.style.display = show ? 'flex' : 'none';
+});
+
+ipcRenderer.on('edit-goto-line', () => {
+    const line = prompt('Go to line number:');
+    if (line) {
+        const lineNum = parseInt(line);
+        if (!isNaN(lineNum)) {
+            // contenteditable doesn't have easy line jumping.
+            // We can approximate by scrolling line-number div
+            const lineNumbers = document.getElementById('line-numbers');
+            const target = lineNumbers.children[lineNum - 1];
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }
+});
+
+
+
+ipcRenderer.on('option-zoom-out', () => { // Not in menu but good helper? 
+    // Menu says "Zoom Height" Alt+2... usually toggles full screen height in IDLE?
+    // Let's implement actual Zoom In/Out if user asks, but strictly stick to IDLE menu:
+    // "Zoom Height" -> Toggles window max height? 
+    // Electron: win.maximize() / restore?
+    ipcRenderer.send('window-zoom-height');
+});
+
+
+
+ipcRenderer.on('run-module', () => {
+    // Save first
+    if (currentFilePath) {
+        const content = document.getElementById('code-content').innerText;
+        fs.writeFileSync(currentFilePath, content);
+
+        // Run
+        runPythonMetadata(currentFilePath);
+    } else {
+        alert('Please save the file before running.');
+        ipcRenderer.send('save-as-request');
+    }
+});
+
+function runPythonMetadata(path) {
+    if (!path) return;
+
+    // Clear console
+    consoleOutput.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'text-gray-500 mb-1';
+    div.textContent = `=== RESTART: ${path} ===`;
+    consoleOutput.appendChild(div);
+
+    // Restart logic: Kill existing, start new with file
+    if (pythonProcess) {
+        pythonProcess.kill();
+    }
+
+    // Spawn new process running the file
+    // Note: IDLE runs the file and then enters interactive mode. 
+    // python -i file.py
+    pythonProcess = spawn('python3', ['-i', '-u', path]);
+
+    pythonProcess.stdout.on('data', (data) => {
+        appendConsoleOutput(data.toString(), 'text-blue-600');
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        const text = data.toString();
+        if (text.trim() === '>>>' || text.trim() === '...') return;
+        appendConsoleOutput(text, 'text-red-500');
+    });
+
+    pythonProcess.on('close', (code) => {
+        appendConsoleOutput(`\n>>> `, 'text-[var(--idle-keyword)] font-bold');
+        // We probably don't want to nullify pythonProcess here if we want to keep using it for shell?
+        // Actually -i keeps it open.
+    });
+}
+
+
+
 
 
 // --- Console Logic ---

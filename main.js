@@ -21,8 +21,7 @@ function createWindow() {
                     label: 'New File',
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
-                        // Placeholder for now, or trigger explorer creation if possible
-                        dialog.showMessageBox(win, { message: 'To create a new file, right-click in the file explorer sidebar.' });
+                        win.webContents.send('new-file');
                     }
                 },
                 {
@@ -39,8 +38,8 @@ function createWindow() {
                 },
                 { label: 'Recent Files', submenu: [{ label: 'No Recent Files', enabled: false }] },
                 { type: 'separator' },
-                { 
-                    label: 'Open Folder...', 
+                {
+                    label: 'Open Folder...',
                     accelerator: 'CmdOrCtrl+Shift+O',
                     click: async () => {
                         const { canceled, filePaths } = await dialog.showOpenDialog(win, {
@@ -94,7 +93,11 @@ function createWindow() {
                 { label: 'Find in Files...', accelerator: 'Alt+F3' },
                 { label: 'Replace...', accelerator: 'CmdOrCtrl+H' },
                 { type: 'separator' },
-                { label: 'Go to Line', accelerator: 'Alt+G' },
+                {
+                    label: 'Go to Line',
+                    accelerator: 'Alt+G',
+                    click: () => win.webContents.send('edit-goto-line')
+                },
                 { label: 'Show Completions', accelerator: 'Control+Space' },
                 { label: 'Expand Word', accelerator: 'Alt+/' },
                 { label: 'Show Call Tip', accelerator: 'CmdOrCtrl+\\' },
@@ -104,22 +107,52 @@ function createWindow() {
         {
             label: 'Format',
             submenu: [
-                { label: 'Format Paragraph', accelerator: 'Alt+Q' },
-                { label: 'Indent Region', accelerator: 'CmdOrCtrl+]' },
-                { label: 'Dedent Region', accelerator: 'CmdOrCtrl+[' },
-                { label: 'Comment Out Region', accelerator: 'Alt+3' },
-                { label: 'Uncomment Region', accelerator: 'Alt+4' },
-                { label: 'Tabify Region', accelerator: 'Alt+5' },
-                { label: 'Untabify Region', accelerator: 'Alt+6' },
+                {
+                    label: 'Indent Region',
+                    accelerator: 'CmdOrCtrl+]',
+                    click: () => win.webContents.send('format-indent')
+                },
+                {
+                    label: 'Dedent Region',
+                    accelerator: 'CmdOrCtrl+[',
+                    click: () => win.webContents.send('format-dedent')
+                },
+                {
+                    label: 'Comment Out Region',
+                    accelerator: 'Alt+3',
+                    click: () => win.webContents.send('format-comment')
+                },
+                {
+                    label: 'Uncomment Region',
+                    accelerator: 'Alt+4',
+                    click: () => win.webContents.send('format-uncomment')
+                },
+                {
+                    label: 'Tabify Region',
+                    accelerator: 'Alt+5',
+                    click: () => win.webContents.send('format-tabify')
+                },
+                {
+                    label: 'Untabify Region',
+                    accelerator: 'Alt+6',
+                    click: () => win.webContents.send('format-untabify')
+                },
                 { label: 'Toggle Tabs', accelerator: 'Alt+T' },
                 { label: 'New Indent Width', accelerator: 'Alt+U' },
-                { label: 'Strip Trailing Whitespace' }
+                {
+                    label: 'Strip Trailing Whitespace',
+                    click: () => win.webContents.send('format-strip-trailing')
+                }
             ]
         },
         {
             label: 'Run',
             submenu: [
-                { label: 'Run Module', accelerator: 'F5' },
+                {
+                    label: 'Run Module',
+                    accelerator: 'F5',
+                    click: () => win.webContents.send('run-module')
+                },
                 { label: 'Run... Customized', accelerator: 'Shift+F5' },
                 { label: 'Check Module', accelerator: 'Alt+X' },
                 { label: 'Python Shell' }
@@ -131,8 +164,27 @@ function createWindow() {
                 { label: 'Configure IDLE' },
                 { type: 'separator' },
                 { label: 'Show Code Context' },
-                { label: 'Show Line Numbers' },
-                { label: 'Zoom Height', accelerator: 'Alt+2' }
+                {
+                    label: 'Show Line Numbers',
+                    type: 'checkbox',
+                    checked: true,
+                    click: () => win.webContents.send('option-show-line-numbers')
+                },
+                {
+                    label: 'Zoom Height',
+                    accelerator: 'Alt+2',
+                    click: () => {
+                        const bounds = win.getBounds();
+                        const { screen } = require('electron');
+                        const display = screen.getDisplayMatching(bounds);
+                        win.setBounds({
+                            x: bounds.x,
+                            y: display.workArea.y,
+                            width: bounds.width,
+                            height: display.workArea.height
+                        });
+                    }
+                }
             ]
         },
         {
@@ -140,9 +192,24 @@ function createWindow() {
             submenu: [
                 { label: '*IDLE Shell 3.13.12*' },
                 { type: 'separator' },
-                { label: 'Explorer', type: 'checkbox', checked: true },
-                { label: 'Console', type: 'checkbox', checked: true },
-                { label: 'AI Agent', type: 'checkbox', checked: true }
+                {
+                    label: 'Explorer',
+                    type: 'checkbox',
+                    checked: true,
+                    click: (menuItem) => win.webContents.send('toggle-explorer', menuItem.checked)
+                },
+                {
+                    label: 'Console',
+                    type: 'checkbox',
+                    checked: true,
+                    click: (menuItem) => win.webContents.send('toggle-console', menuItem.checked)
+                },
+                {
+                    label: 'AI Agent',
+                    type: 'checkbox',
+                    checked: true,
+                    click: (menuItem) => win.webContents.send('toggle-ai-agent', menuItem.checked)
+                }
             ]
         },
         {
