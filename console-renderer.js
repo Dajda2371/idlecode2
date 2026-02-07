@@ -115,16 +115,21 @@ consoleInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         if (!currentSessionId) return;
         const command = consoleInput.value;
+        const promptSpan = document.getElementById('console-prompt');
+        const isPromptHidden = promptSpan && promptSpan.style.display === 'none';
+        const isInputResponse = waitingForInput || isPromptHidden;
 
         // Check if we're waiting for input() response
-        if (waitingForInput) {
+        if (isInputResponse) {
             // Create a line with the prompt in blue (stdout color) and input in black
             const div = document.createElement('div');
             div.className = "mt-1";
 
+            const promptText = waitingForInput ? inputPromptText : "";
+
             // Only show prompt if it's not empty
-            if (inputPromptText !== '') {
-                const inputPromptSpan = `<span class="text-blue-600">${escapeHtml(inputPromptText)}</span>`;
+            if (promptText !== '') {
+                const inputPromptSpan = `<span class="text-blue-600">${escapeHtml(promptText)}</span>`;
                 const inputSpan = `<span>${escapeHtml(command)}</span>`;
                 div.innerHTML = inputPromptSpan + inputSpan;
             } else {
@@ -134,15 +139,14 @@ consoleInput.addEventListener('keydown', (e) => {
             consoleOutput.appendChild(div);
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
 
-            // Send just the user's input to Python
-            ipcRenderer.send('session-input', currentSessionId, command);
+            // Send just the user's input to Python, with isInputResponse=true
+            ipcRenderer.send('session-input', currentSessionId, command, true);
 
             // Clear the waiting state
             waitingForInput = false;
             inputPromptText = '';
 
             // Restore the normal prompt (and make it visible again)
-            const promptSpan = document.getElementById('console-prompt');
             if (promptSpan) {
                 promptSpan.style.display = '';
                 promptSpan.innerText = currentPromptText || '>>>';
@@ -154,10 +158,9 @@ consoleInput.addEventListener('keydown', (e) => {
         } else {
             // Normal command handling
             // Send to Main (it will echo back as 'input' type)
-            ipcRenderer.send('session-input', currentSessionId, command);
+            ipcRenderer.send('session-input', currentSessionId, command, false);
 
             // Hide the prompt immediately
-            const promptSpan = document.getElementById('console-prompt');
             if (promptSpan) promptSpan.style.display = 'none';
 
             // Clear input
@@ -212,7 +215,10 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
     if (type === 'standard') {
         currentIndentLevel = 0;
         currentPromptText = '>>>';
-        if (promptSpan) promptSpan.innerText = '>>>';
+        if (promptSpan) {
+            promptSpan.style.display = '';
+            promptSpan.innerText = '>>>';
+        }
         consoleInput.value = '';
     } else if (type === 'continuation') {
         // Calculate based on history
@@ -235,7 +241,10 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
         const promptText = '...';
 
         currentPromptText = promptText;
-        if (promptSpan) promptSpan.innerText = promptText;
+        if (promptSpan) {
+            promptSpan.style.display = '';
+            promptSpan.innerText = promptText;
+        }
 
         // Auto-fill input
         if (indents > 0) {

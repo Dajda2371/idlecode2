@@ -529,11 +529,11 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     });
 });
 
-ipcMain.on('session-input', (event, sessionId, input) => {
+ipcMain.on('session-input', (event, sessionId, input, isInputResponse) => {
     const session = sessions.get(sessionId);
     if (session) {
-        // If we were waiting for input, don't echo as a command
-        if (session.waitingForInput) {
+        // If we were waiting for input (detected by backend) or renderer tells us it's an input response
+        if (session.waitingForInput || isInputResponse) {
             // Just send the input to Python, the renderer will handle echoing
             session.waitingForInput = false;
             if (session.process) {

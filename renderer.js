@@ -990,16 +990,20 @@ consoleInput.addEventListener('keydown', (e) => {
         if (!currentConsole) return;
 
         const command = consoleInput.value;
+        const isPromptHidden = consolePrompt && consolePrompt.style.display === 'none';
+        const isInputResponse = currentConsole.waitingForInput || isPromptHidden;
 
         // Check if we're waiting for input() response
-        if (currentConsole.waitingForInput) {
+        if (isInputResponse) {
             // Create a line with the prompt in blue (stdout color) and input in black
             const div = document.createElement('div');
             div.className = "mt-1";
 
+            const promptText = currentConsole.waitingForInput ? currentConsole.inputPromptText : "";
+
             // Only show prompt if it's not empty
-            if (currentConsole.inputPromptText !== '') {
-                const promptSpan = `<span class="text-blue-600">${escapeHtml(currentConsole.inputPromptText)}</span>`;
+            if (promptText !== '') {
+                const promptSpan = `<span class="text-blue-600">${escapeHtml(promptText)}</span>`;
                 const inputSpan = `<span>${escapeHtml(command)}</span>`;
                 div.innerHTML = promptSpan + inputSpan;
             } else {
@@ -1013,8 +1017,8 @@ consoleInput.addEventListener('keydown', (e) => {
                 outputContainer.scrollTop = outputContainer.scrollHeight;
             }
 
-            // Send just the user's input to Python
-            ipcRenderer.send('session-input', currentConsole.id, command);
+            // Send just the user's input to Python, with isInputResponse=true
+            ipcRenderer.send('session-input', currentConsole.id, command, true);
 
             // Clear the waiting state
             currentConsole.waitingForInput = false;
@@ -1033,7 +1037,7 @@ consoleInput.addEventListener('keydown', (e) => {
         } else {
             // Normal command handling
             // Send to Main (it will echo back as 'input' type which we render)
-            ipcRenderer.send('session-input', currentConsole.id, command);
+            ipcRenderer.send('session-input', currentConsole.id, command, false);
 
             // Hide the prompt immediately to allow stretching if next state is input() 
             // the prompt will be shown again when session-prompt or session-input-prompt is received
@@ -1122,6 +1126,7 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
     // Update UI if active
     if (activeConsoleId === sessionId) {
         if (consolePrompt) {
+            consolePrompt.style.display = '';
             consolePrompt.innerText = consoleData.promptText;
         }
 
