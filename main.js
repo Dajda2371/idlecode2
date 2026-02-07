@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Menu, dialog, shell } = require('electron')
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron')
 const path = require('path')
+const { spawn } = require('child_process');
 
 // Debugging helper
 ipcMain.on('log', (event, msg) => {
@@ -304,8 +305,6 @@ function createWindow() {
     Menu.setApplicationMenu(menu)
 }
 
-const { ipcMain } = require('electron');
-
 
 
 ipcMain.on('save-file', () => {
@@ -384,7 +383,6 @@ ipcMain.on('new-console-window', () => {
 });
 
 // --- Session Management ---
-const { spawn } = require('child_process');
 const sessions = new Map();
 
 // Helper: Broadcast to all windows listening to a session
