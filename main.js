@@ -335,7 +335,7 @@ app.on('window-all-closed', () => {
 })
 
 // --- Custom Console Logic ---
-const { ipcMain } = require('electron');
+// const { ipcMain } = require('electron'); // Removed duplicate
 
 // Pop out console / Run Module separately
 ipcMain.on('run-module-popout', (event, filePath) => {

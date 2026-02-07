@@ -1,12 +1,15 @@
 const { spawn } = require('child_process');
+const { ipcRenderer } = require('electron');
 
 let pythonProcess = null;
 const consoleOutput = document.getElementById('console-output');
 const consoleInput = document.getElementById('console-input');
 const clearConsoleBtn = document.getElementById('clear-console-btn');
 
-function initPythonShell() {
-    pythonProcess = spawn('python3', ['-i', '-u']);
+function initPythonShell(args = ['-i', '-u']) {
+    if (pythonProcess) pythonProcess.kill();
+
+    pythonProcess = spawn('python3', args);
 
     pythonProcess.stdout.on('data', (data) => {
         appendConsoleOutput(data.toString(), 'text-blue-600');
@@ -24,6 +27,17 @@ function initPythonShell() {
         pythonProcess = null;
     });
 }
+
+ipcRenderer.on('run-file', (event, filePath) => {
+    consoleOutput.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'text-gray-500 mb-1';
+    div.textContent = `=== RESTART: ${filePath} ===`;
+    consoleOutput.appendChild(div);
+
+    // Run with file path
+    initPythonShell(['-i', '-u', filePath]);
+});
 
 function appendConsoleOutput(text, colorClass) {
     const div = document.createElement('div');
@@ -82,4 +96,8 @@ clearConsoleBtn.addEventListener('click', () => {
 
 // Focus input on load
 consoleInput.focus();
+// Only init generic shell if NOT running a file immediately?
+// But run-file comes later via IPC.
+// So safe to init generic shell first, then restart if run-file comes.
 initPythonShell();
+
