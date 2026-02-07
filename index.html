@@ -93,11 +93,34 @@
             <div class="overflow-y-auto flex-1" id="file-tree">
             </div>
         </aside>
-        <main class="flex-1 flex overflow-auto bg-white border-r border-gray-200">
-            <div class="w-10 bg-white border-r border-gray-100 py-2 text-right pr-2 text-gray-400 select-none text-[13px]"
-                id="line-numbers">
+        <main class="flex-1 flex flex-col bg-white border-r border-gray-200 overflow-hidden">
+            <!-- Editor Area -->
+            <div class="flex-1 flex overflow-auto min-h-[200px]" id="editor-area">
+                <div class="w-10 bg-white border-r border-gray-100 py-2 text-right pr-2 text-gray-400 select-none text-[13px]"
+                    id="line-numbers">
+                </div>
+                <div class="flex-1 p-2 text-[14px] leading-tight whitespace-pre font-mono outline-none"
+                    id="code-content" contenteditable="false">
+                </div>
             </div>
-            <div class="flex-1 p-2 text-[14px] leading-tight whitespace-pre font-mono" id="code-content">
+
+            <!-- Console Area -->
+            <div class="h-[250px] flex flex-col border-t border-gray-300 bg-white font-mono text-[13px]"
+                id="console-area">
+                <div
+                    class="bg-gray-100 px-2 py-1 text-xs text-gray-500 border-b border-gray-200 flex justify-between select-none">
+                    <span>Interactive Console</span>
+                    <span class="cursor-pointer hover:text-red-500" id="clear-console-btn">Clear</span>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2" id="console-output">
+                    <div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>
+                </div>
+                <div class="flex items-center border-t border-gray-200 px-2 bg-white">
+                    <span class="text-[var(--idle-keyword)] font-bold mr-2 select-none">&gt;&gt;&gt;</span>
+                    <input type="text"
+                        class="flex-1 py-1 outline-none text-black bg-transparent border-none font-mono text-[13px] h-8"
+                        id="console-input" autocomplete="off" spellcheck="false">
+                </div>
             </div>
         </main>
         <aside class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans">

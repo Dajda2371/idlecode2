@@ -371,5 +371,103 @@ function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-window.toggleMenu = (menuId) => {
-};
+
+// --- Console Logic ---
+const { spawn } = require('child_process');
+
+let pythonProcess = null;
+const consoleOutput = document.getElementById('console-output');
+const consoleInput = document.getElementById('console-input');
+const clearConsoleBtn = document.getElementById('clear-console-btn');
+
+function initPythonShell() {
+    // Spawn python3 in interactive mode (-i) and unbuffered (-u)
+    // We use -i to force interactive mode even though it's a pipe.
+    pythonProcess = spawn('python3', ['-i', '-u']);
+
+    pythonProcess.stdout.on('data', (data) => {
+        appendConsoleOutput(data.toString(), 'text-blue-600'); // IDLE stdout is blue
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        // Python interactive mode echoes the prompt to stderr usually
+        const text = data.toString();
+        if (text.trim() === '>>>' || text.trim() === '...') {
+            // These prompts are handled by our UI, we might want to ignore them 
+            // or we might want to show them if we want exact behavior.
+            // For now, let's ignore the generic prompts because we have our own input field prompt
+            return;
+        }
+        appendConsoleOutput(text, 'text-red-500'); // IDLE stderr is red
+    });
+
+    pythonProcess.on('close', (code) => {
+        appendConsoleOutput(`\nProcess exited with code ${code}\n`, 'text-gray-500');
+        pythonProcess = null;
+    });
+}
+
+function appendConsoleOutput(text, colorClass) {
+    const span = document.createElement('span');
+    span.className = `${colorClass} whitespace-pre-wrap font-mono`;
+    span.textContent = text;
+
+    // Check if the last element is a span, merge if same color to avoid too many nodes? 
+    // Simplified: just append div or span.
+    // Use div for blocks?
+    const div = document.createElement('div');
+    div.className = `${colorClass} whitespace-pre-wrap break-all`;
+    div.textContent = text;
+
+    consoleOutput.appendChild(div);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+// Input Handling
+let commandHistory = [];
+let historyIndex = -1;
+
+consoleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const command = consoleInput.value;
+
+        // Echo command
+        const echoDiv = document.createElement('div');
+        echoDiv.innerHTML = `<span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapeHtml(command)}</span>`;
+        consoleOutput.appendChild(echoDiv);
+
+        if (pythonProcess) {
+            pythonProcess.stdin.write(command + '\n');
+        } else {
+            appendConsoleOutput('Python process is not running. Restarting...', 'text-gray-500');
+            initPythonShell();
+            if (pythonProcess) pythonProcess.stdin.write(command + '\n');
+        }
+
+        commandHistory.push(command);
+        historyIndex = commandHistory.length;
+        consoleInput.value = '';
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    } else if (e.key === 'ArrowUp') {
+        if (historyIndex > 0) {
+            historyIndex--;
+            consoleInput.value = commandHistory[historyIndex];
+        }
+    } else if (e.key === 'ArrowDown') {
+        if (historyIndex < commandHistory.length - 1) {
+            historyIndex++;
+            consoleInput.value = commandHistory[historyIndex];
+        } else {
+            historyIndex = commandHistory.length;
+            consoleInput.value = '';
+        }
+    }
+});
+
+clearConsoleBtn.addEventListener('click', () => {
+    consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
+});
+
+// Start shell on load
+initPythonShell();
+
