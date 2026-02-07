@@ -301,18 +301,7 @@ function createWindow() {
 
 const { ipcMain } = require('electron');
 
-ipcMain.on('pop-out-console', () => {
-    const consoleWin = new BrowserWindow({
-        width: 800,
-        height: 600,
-        title: 'IDLE Console',
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
-        }
-    });
-    consoleWin.loadFile('console.html');
-});
+
 
 ipcMain.on('save-file', () => {
     // handled in renderer or we can add logic here if needed

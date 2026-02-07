@@ -555,15 +555,8 @@ ipcRenderer.on('toggle-console', (event, show) => {
             el.style.display = 'none';
             // Pop Out: Open windows for active shells
             consoles.forEach(c => {
-                // Send request to main to open a window for this shell
-                // We pass filePath so it can restart the run.
-                // We pass name so it has a title.
-                // We can't pass the process itself.
-                if (c.filePath) {
-                    ipcRenderer.send('run-module-popout', c.filePath);
-                } else {
-                    ipcRenderer.send('new-console-window');
-                }
+                // Pop Out existing session
+                ipcRenderer.send('pop-out-session', c.id, c.name);
             });
         }
     }
@@ -705,11 +698,7 @@ if (hideConsoleBtn) {
 
             // Trigger pop-out logic manually since we are hiding directly
             consoles.forEach(c => {
-                if (c.filePath) {
-                    ipcRenderer.send('run-module-popout', c.filePath);
-                } else {
-                    ipcRenderer.send('new-console-window');
-                }
+                ipcRenderer.send('pop-out-session', c.id, c.name);
             });
         }
     };
