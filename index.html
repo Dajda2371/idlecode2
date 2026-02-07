@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Python 3.8.1: tic_tac_toe_0.2.py</title>
+    <title>IDLE</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
@@ -74,26 +74,92 @@
 </head>
 
 <body class="h-screen flex flex-col overflow-hidden">
-    <div class="window-title-bar select-none">
-        <div class="flex items-center gap-2">
-            <img alt="IDLE Icon" class="w-4 h-4"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZuvFWVYuAOhHr0s9TPhAo-fpwjrCvSB8HZ4WsXLBVu7XkNXZAwpBd7atmXAR-dElOI9wNnE_sPUjjhjOYQAucnD2ln-JwwPk-enDFDVfAJ_jc2xidDw5vabPSbq0f4VKcVH_N9Q9eOnZh8fUwgRf4Hk7Os3RdSzvRTbM9sCW4OqZ-vNURIwBTDtLV5L6Rljkds9OpqiW4FYT7mmwL9w44BLzMrwh_Jbbc6w5G4vV3Dv_IbWGMFc94_SvwpqpXzLmxFEuOwA9aTS8" />
-            <span id="current-file-label">IDLECODE</span>
+
+    <nav class="bg-[#f0f0f0] border-b border-gray-300 px-1 pt-0.5 flex text-[13px] select-none relative z-50">
+        <!-- File Menu Container -->
+        <div class="relative group">
+            <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default peer" id="menu-file-trigger"
+                onclick="toggleMenu('file-menu')">File</div>
+            <!-- Dropdown Menu -->
+            <div id="file-menu"
+                class="absolute top-full left-0 w-64 bg-white border border-gray-400 shadow-lg hidden group-hover:block z-50 py-1 text-black font-sans">
+                <!-- Menu Item -->
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>New File</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Ctrl+N</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Open...</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Ctrl+O</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Open Module...</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Alt+M</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer relative group/submenu">
+                    <span>Recent Files</span>
+                    <span class="material-symbols-outlined text-[14px]">arrow_right</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Module Browser</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Alt+C</span>
+                </div>
+                <div class="px-6 py-1 hover:bg-[#0078d7] hover:text-white cursor-pointer">
+                    <span>Path Browser</span>
+                </div>
+
+                <div class="border-b border-gray-300 my-1 mx-1"></div>
+
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Save</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Ctrl+S</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Save As...</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Ctrl+Shift+S</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Save Copy As...</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Alt+Shift+S</span>
+                </div>
+
+                <div class="border-b border-gray-300 my-1 mx-1"></div>
+
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Print Window</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Ctrl+P</span>
+                </div>
+
+                <div class="border-b border-gray-300 my-1 mx-1"></div>
+
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Close Window</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Alt+F4</span>
+                </div>
+                <div
+                    class="px-6 py-1 flex justify-between hover:bg-[#0078d7] hover:text-white cursor-pointer group/item">
+                    <span>Exit IDLE</span><span
+                        class="text-gray-500 group-hover/item:text-white text-xs pt-0.5">Ctrl+Q</span>
+                </div>
+            </div>
         </div>
-        <div class="window-controls">
-            <div class="control-btn">_</div>
-            <div class="control-btn">□</div>
-            <div class="control-btn bg-[#e81123] text-white border-none">×</div>
-        </div>
-    </div>
-    <nav class="bg-[#f0f0f0] border-b border-gray-300 px-1 py-0.5 flex gap-4 text-sm select-none">
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">File</div>
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Edit</div>
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Format</div>
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Run</div>
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Options</div>
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Window</div>
-        <div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Help</div>
+
+        <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default">Edit</div>
+        <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default">Shell</div>
+        <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default">Debug</div>
+        <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default">Options</div>
+        <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default">Window</div>
+        <div class="px-2 pb-0.5 hover:bg-blue-600 hover:text-white cursor-default">Help</div>
     </nav>
     <div class="flex-1 flex overflow-hidden">
         <aside

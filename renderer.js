@@ -13,7 +13,6 @@ const ICONS = {
 const treeContainer = document.getElementById('file-tree');
 const codeContent = document.getElementById('code-content');
 const lineNumbers = document.getElementById('line-numbers');
-const currentFileLabel = document.getElementById('current-file-label');
 
 // Initial Load
 loadDirectory(PROJECT_ROOT, treeContainer);
@@ -114,10 +113,10 @@ function openFile(filePath) {
     fs.readFile(filePath, 'utf-8', (err, data) => {
         if (err) return console.error(err);
 
-        // Update Label
-        if (currentFileLabel) {
-            currentFileLabel.textContent = `${path.basename(filePath)} - ${filePath}`;
-        }
+
+        // Update Title
+        document.title = `${path.basename(filePath)} - ${filePath}`;
+
 
         // Render Content
         renderCode(data);
@@ -165,3 +164,16 @@ function escapeHtml(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+
+// Menu Toggling
+window.toggleMenu = (menuId) => {
+    // If we were using manual toggling logic, it would go here.
+    // Since we rely on HTML structure and potential future needs:
+    const menu = document.getElementById(menuId);
+    if (!menu) return;
+
+    // For now, we rely on group-hover in CSS, but if we wanted click:
+    // menu.classList.toggle('hidden');
+    // Note: The current HTML uses group-hover:block, so this might conflict if we mix paradigms.
+    // But the user asked to "add this menu", so the visual structure is key.
+};
