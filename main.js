@@ -1,6 +1,11 @@
 const { app, BrowserWindow, Menu, dialog, shell } = require('electron')
 const path = require('path')
 
+// Debugging helper
+ipcMain.on('log', (event, msg) => {
+    console.log('[RENDERER]', msg);
+});
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
