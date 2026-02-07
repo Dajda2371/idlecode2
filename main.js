@@ -91,24 +91,27 @@ function createWindow() {
             ]
         },
         {
-            label: 'Shell',
+            label: 'Format',
             submenu: [
-                { label: 'View Last Restart', accelerator: 'F6' },
-                { label: 'Restart Shell', accelerator: 'CmdOrCtrl+F6' },
-                { type: 'separator' },
-                { label: 'Previous History', accelerator: 'Alt+P' },
-                { label: 'Next History', accelerator: 'Alt+N' },
-                { type: 'separator' },
-                { label: 'Interrupt Execution', accelerator: 'CmdOrCtrl+C' }
+                { label: 'Format Paragraph', accelerator: 'Alt+Q' },
+                { label: 'Indent Region', accelerator: 'CmdOrCtrl+]' },
+                { label: 'Dedent Region', accelerator: 'CmdOrCtrl+[' },
+                { label: 'Comment Out Region', accelerator: 'Alt+3' },
+                { label: 'Uncomment Region', accelerator: 'Alt+4' },
+                { label: 'Tabify Region', accelerator: 'Alt+5' },
+                { label: 'Untabify Region', accelerator: 'Alt+6' },
+                { label: 'Toggle Tabs', accelerator: 'Alt+T' },
+                { label: 'New Indent Width', accelerator: 'Alt+U' },
+                { label: 'Strip Trailing Whitespace' }
             ]
         },
         {
-            label: 'Debug',
+            label: 'Run',
             submenu: [
-                { label: 'Go to File/Line' },
-                { label: 'Debugger' },
-                { label: 'Stack Viewer' },
-                { label: 'Auto-open Stack Viewer' }
+                { label: 'Run Module', accelerator: 'F5' },
+                { label: 'Run... Customized', accelerator: 'Shift+F5' },
+                { label: 'Check Module', accelerator: 'Alt+X' },
+                { label: 'Python Shell' }
             ]
         },
         {
