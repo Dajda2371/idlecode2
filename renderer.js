@@ -960,8 +960,13 @@ if (addConsoleBtn) {
     });
 }
 
-// Start default shell
-createConsole();
+// Start with empty state
+renderConsoleList();
+if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
+consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
+if (Object.keys(consoles).length === 0) {
+    if (typeof closeActiveConsoleBtn !== 'undefined' && closeActiveConsoleBtn) closeActiveConsoleBtn.classList.add('hidden');
+}
 
 const popOutBtn = document.getElementById('pop-out-console-btn');
 if (popOutBtn) {
