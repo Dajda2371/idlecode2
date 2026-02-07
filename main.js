@@ -429,19 +429,27 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     pyProcess.stderr.on('data', (data) => {
         let str = data.toString();
 
-        if (str === '>>> ' || str === '>>>') {
-            broadcastToSession(sessionId, 'session-prompt', 'standard');
-            return;
+        // Check for prompts at the END of the string
+        let promptType = null;
+        if (str.endsWith('>>> ') || str.endsWith('>>>')) {
+            promptType = 'standard';
+            str = str.replace(/>>> ?$/, ''); // Strip it
+        } else if (str.endsWith('... ') || str.endsWith('...')) {
+            promptType = 'continuation';
+            str = str.replace(/\.\.\. ?$/, ''); // Strip it
         }
 
-        if (str === '... ' || str === '...') {
-            broadcastToSession(sessionId, 'session-prompt', 'continuation');
-            return;
+        // If there was content before the prompt (or if it was just content)
+        if (str.length > 0) {
+            const entry = { type: 'stderr', text: str };
+            session.history.push(entry);
+            broadcastToSession(sessionId, 'session-output', entry);
         }
 
-        const entry = { type: 'stderr', text: str };
-        session.history.push(entry);
-        broadcastToSession(sessionId, 'session-output', entry);
+        // Broadcast prompt change if detected
+        if (promptType) {
+            broadcastToSession(sessionId, 'session-prompt', promptType);
+        }
     });
 
     pyProcess.on('close', (code) => {
