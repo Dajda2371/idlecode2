@@ -338,6 +338,9 @@ app.on('window-all-closed', () => {
 // const { ipcMain } = require('electron'); // Removed duplicate
 
 // Pop out console / Run Module separately
+
+let poppedConsoles = [];
+
 ipcMain.on('run-module-popout', (event, filePath) => {
     const subWin = new BrowserWindow({
         width: 800,
@@ -349,11 +352,16 @@ ipcMain.on('run-module-popout', (event, filePath) => {
         }
     });
 
-    subWin.loadFile('console.html'); // Ensure this file exists, or reuse index and hide editor?
-    // Let's reuse console.html (user has it in file list)
+    subWin.loadFile('console.html');
+    poppedConsoles.push(subWin);
 
     subWin.webContents.once('did-finish-load', () => {
         subWin.webContents.send('run-file', filePath);
+    });
+
+    subWin.on('closed', () => {
+        const idx = poppedConsoles.indexOf(subWin);
+        if (idx > -1) poppedConsoles.splice(idx, 1);
     });
 });
 
@@ -368,5 +376,17 @@ ipcMain.on('new-console-window', () => {
         }
     });
     subWin.loadFile('console.html');
+    poppedConsoles.push(subWin);
+
+    subWin.on('closed', () => {
+        const idx = poppedConsoles.indexOf(subWin);
+        if (idx > -1) poppedConsoles.splice(idx, 1);
+    });
 });
+
+ipcMain.on('close-popped-consoles', () => {
+    poppedConsoles.forEach(w => w.close());
+    poppedConsoles = [];
+});
+
 

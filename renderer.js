@@ -537,7 +537,36 @@ ipcRenderer.on('toggle-explorer', (event, show) => {
 
 ipcRenderer.on('toggle-console', (event, show) => {
     const el = document.getElementById('console-area');
-    if (el) el.style.display = show ? 'flex' : 'none';
+    if (el) {
+        if (show) {
+            el.style.display = 'flex';
+            // Pop Back In: Close any popped out windows associated with our sessions
+            // Ideally main process handles closing the windows.
+            // But we need to restore sessions?
+            // User requested: "pop back in".
+            // If we just close the windows, we lose the session if it was remote.
+            // BUT, our "pop out" implementation below will just be spawning new windows.
+            // We can't really "move" the session back.
+            // However, if we interpret "pop out" as just hiding local and showing remote,
+            // and "pop in" as hiding remote and showing local...
+            // We can perhaps just close the remote windows.
+            ipcRenderer.send('close-popped-consoles');
+        } else {
+            el.style.display = 'none';
+            // Pop Out: Open windows for active shells
+            consoles.forEach(c => {
+                // Send request to main to open a window for this shell
+                // We pass filePath so it can restart the run.
+                // We pass name so it has a title.
+                // We can't pass the process itself.
+                if (c.filePath) {
+                    ipcRenderer.send('run-module-popout', c.filePath);
+                } else {
+                    ipcRenderer.send('new-console-window');
+                }
+            });
+        }
+    }
 });
 
 ipcRenderer.on('edit-goto-line', () => {
