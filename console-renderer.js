@@ -178,7 +178,7 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
     // <span class="text-idle-keyword ...">>>></span> <input ...>
     // We need to target that span. Let's give it an ID first in console.html or find it here.
 
-    const promptSpan = document.querySelector('.text-idle-keyword.font-bold.mr-2.select-none'); // Roughly
+    const promptSpan = document.getElementById('console-prompt');
 
     if (type === 'standard') {
         currentIndentLevel = 0;
