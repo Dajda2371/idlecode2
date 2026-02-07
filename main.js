@@ -482,7 +482,7 @@ ipcMain.on('session-kill', (event, sessionId) => {
     const session = sessions.get(sessionId);
     if (session && session.process) {
         session.process.kill();
-        sessions.delete(sessionId);
+        // Determine cleanup via 'close' event handler to ensure exit is broadcasted
     }
 });
 

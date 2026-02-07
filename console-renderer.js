@@ -140,6 +140,13 @@ consoleInput.addEventListener('input', () => {
     }
 });
 
+// Kill session on window close
+window.addEventListener('beforeunload', () => {
+    if (currentSessionId) {
+        ipcRenderer.send('session-kill', currentSessionId);
+    }
+});
+
 clearConsoleBtn.addEventListener('click', () => {
     consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
 });
