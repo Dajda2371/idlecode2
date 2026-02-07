@@ -686,6 +686,7 @@ const consoleList = document.getElementById('console-list');
 const addConsoleBtn = document.getElementById('add-console-btn');
 const activeConsoleTitle = document.getElementById('active-console-title');
 const hideConsoleBtn = document.getElementById('hide-console-area-btn');
+const consolePrompt = document.getElementById('console-prompt');
 
 if (hideConsoleBtn) {
     hideConsoleBtn.onclick = () => {
@@ -866,6 +867,9 @@ function switchConsole(id) {
 
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
 
+    // Show prompt
+    if (consolePrompt) consolePrompt.style.display = 'inline';
+
     renderConsoleList();
     consoleInput.focus();
 }
@@ -887,8 +891,13 @@ function closeConsole(id) {
         activeConsoleId = null;
 
         // Clear UI
+        // Clear UI
         consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
         if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
+
+        // Hide prompt
+        if (consolePrompt) consolePrompt.style.display = 'none';
+
         renderConsoleList();
     } else {
         if (activeConsoleId === id) {
@@ -1038,7 +1047,10 @@ if (addConsoleBtn) {
 // Start with empty state
 renderConsoleList();
 if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
+if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
 consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
+if (consolePrompt) consolePrompt.style.display = 'none';
+
 if (Object.keys(consoles).length === 0) {
     if (typeof closeActiveConsoleBtn !== 'undefined' && closeActiveConsoleBtn) closeActiveConsoleBtn.classList.add('hidden');
 }
