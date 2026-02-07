@@ -1077,8 +1077,8 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
 
         consoleData.indentLevel = newIndent;
 
-        // User requested ". . ." instead of numbers
-        consoleData.promptText = '. . .';
+        // User requested "..." for continuation
+        consoleData.promptText = '...';
         console.log(`[RENDERER] Set prompt to: . . . (indent level: ${newIndent})`);
     }
 

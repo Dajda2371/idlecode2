@@ -193,8 +193,8 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
 
         currentIndentLevel = indents;
 
-        // User requested ". . ."
-        const promptText = '. . .';
+        // User requested "..." for continuation
+        const promptText = '...';
 
         currentPromptText = promptText;
         if (promptSpan) promptSpan.innerText = promptText;

@@ -2,11 +2,6 @@ const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process');
 
-// Debugging helper
-ipcMain.on('log', (event, msg) => {
-    console.log('[RENDERER]', msg);
-});
-
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
@@ -314,6 +309,10 @@ ipcMain.on('save-file', () => {
 app.whenReady().then(() => {
     createWindow()
 
+    // Debugging helper
+    ipcMain.on('log', (event, msg) => {
+        console.log('[RENDERER]', msg);
+    });
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
