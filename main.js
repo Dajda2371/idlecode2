@@ -417,7 +417,9 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     const session = {
         id: sessionId,
         process: pyProcess,
-        history: '', // Store output history
+        history: [],
+        commandHistory: [],
+        inputDraft: '',
         listeners: new Set()
     };
 
@@ -426,27 +428,49 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     // Handle Output
     pyProcess.stdout.on('data', (data) => {
         const str = data.toString();
-        session.history += str;
-        broadcastToSession(sessionId, 'session-output', str);
+        const entry = { type: 'stdout', text: str };
+        session.history.push(entry);
+        broadcastToSession(sessionId, 'session-output', entry);
     });
 
     pyProcess.stderr.on('data', (data) => {
         const str = data.toString();
-        session.history += str; // Combine stderr into history
-        broadcastToSession(sessionId, 'session-output', str); // sending everything as output for now
+        const entry = { type: 'stderr', text: str };
+        session.history.push(entry);
+        broadcastToSession(sessionId, 'session-output', entry);
     });
 
     pyProcess.on('close', (code) => {
-        session.history += `\n[Process exited with code ${code}]\n`;
+        const entry = { type: 'meta', text: `\n[Process exited with code ${code}]\n` };
+        session.history.push(entry);
         broadcastToSession(sessionId, 'session-exit', code);
+        // Delay deletion?
         sessions.delete(sessionId);
     });
 });
 
 ipcMain.on('session-input', (event, sessionId, input) => {
     const session = sessions.get(sessionId);
-    if (session && session.process) {
-        session.process.stdin.write(input + '\n');
+    if (session) {
+        // Record Input
+        const entry = { type: 'input', text: input };
+        session.history.push(entry);
+        session.commandHistory.push(input);
+
+        broadcastToSession(sessionId, 'session-output', entry); // Echo to all views
+
+        if (session.process) {
+            session.process.stdin.write(input + '\n');
+        }
+    }
+});
+
+// Sync input draft
+ipcMain.on('session-input-draft', (event, sessionId, draft) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+        session.inputDraft = draft;
+        broadcastToSession(sessionId, 'session-input-draft', draft);
     }
 });
 
@@ -463,7 +487,7 @@ ipcMain.on('session-attach', (event, sessionId) => {
     if (session) {
         session.listeners.add(event.sender);
         // Send history upon attach
-        event.sender.send('session-history', sessionId, session.history);
+        event.sender.send('session-history', sessionId, session.history, session.commandHistory, session.inputDraft);
 
         // Remove listener when window closes (sender destroyed)
         event.sender.once('destroyed', () => {

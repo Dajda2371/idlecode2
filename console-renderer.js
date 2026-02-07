@@ -5,87 +5,119 @@ const consoleOutput = document.getElementById('console-output');
 const consoleInput = document.getElementById('console-input');
 const clearConsoleBtn = document.getElementById('clear-console-btn');
 
+let commandHistory = [];
+let historyIndex = -1;
+
 // --- IPC Listeners ---
 
-// 1. Attach to a session (sent by Main when popping out)
 ipcRenderer.on('attach-to-session', (event, sessionId) => {
     currentSessionId = sessionId;
     ipcRenderer.send('session-attach', sessionId);
 });
 
-// 2. Receive session history (on attach)
-ipcRenderer.on('session-history', (event, sessionId, history) => {
+// Receive full state on attach
+ipcRenderer.on('session-history', (event, sessionId, history, cmdHistory, draft) => {
     if (sessionId !== currentSessionId) return;
-    consoleOutput.innerHTML = ''; // Clear initial "Ready" message
 
-    // History is raw text aggregation. 
-    // We wrap it in a div to preserve whitespace.
-    const div = document.createElement('div');
-    div.className = 'whitespace-pre-wrap break-all text-gray-800';
-    div.innerText = history;
-    consoleOutput.appendChild(div);
+    // 1. Render Output History
+    consoleOutput.innerHTML = '';
+    if (Array.isArray(history)) {
+        history.forEach(entry => appendEntry(entry));
+    }
+
+    // 2. Restore Command History
+    if (Array.isArray(cmdHistory)) {
+        commandHistory = cmdHistory;
+        historyIndex = commandHistory.length;
+    }
+
+    // 3. Restore Draft
+    if (draft) {
+        consoleInput.value = draft;
+    }
+
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
 });
 
-// 3. Receive live output
-ipcRenderer.on('session-output', (event, sessionId, data) => {
+// Receive live output (or echoed input)
+ipcRenderer.on('session-output', (event, sessionId, entry) => {
     if (sessionId !== currentSessionId) return;
-    appendConsoleOutput(data, 'text-gray-800');
+
+    if (entry.type === 'input') {
+        commandHistory.push(entry.text);
+        historyIndex = commandHistory.length;
+    }
+
+    appendEntry(entry);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
 });
 
-// 4. Session exited
 ipcRenderer.on('session-exit', (event, sessionId, code) => {
     if (sessionId !== currentSessionId) return;
-    appendConsoleOutput(`\n[Process exited with code ${code}]\n`, 'text-gray-500');
+    appendEntry({ type: 'meta', text: `\n[Process exited with code ${code}]\n` });
+});
+
+ipcRenderer.on('session-input-draft', (event, sessionId, draft) => {
+    if (sessionId !== currentSessionId) return;
+    if (consoleInput !== document.activeElement) {
+        consoleInput.value = draft;
+    }
 });
 
 // --- UI Logic ---
 
-function appendConsoleOutput(text, colorClass) {
+function appendEntry(entry) {
+    if (!entry || !entry.text) return;
+
+    if (entry.type === 'input') {
+        // Render as prompt echo
+        const div = document.createElement('div');
+        div.className = "mt-1";
+        // Use innerHTML for prompt styling, escape text
+        div.innerHTML = `<span class="text-idle-keyword font-bold mr-2">>>></span><span>${escapeHtml(entry.text)}</span>`;
+        consoleOutput.appendChild(div);
+        return;
+    }
+
+    // Determine Style
+    let colorClass = 'text-gray-800';
+    if (entry.type === 'stdout') colorClass = 'text-blue-600';
+    else if (entry.type === 'stderr') colorClass = 'text-red-500';
+    else if (entry.type === 'meta') colorClass = 'text-gray-500 italic';
+
     const div = document.createElement('div');
     div.className = `${colorClass} whitespace-pre-wrap break-all`;
-    div.innerText = text; // Usage of innerText handles escaping for us generally
+    div.innerText = entry.text;
     consoleOutput.appendChild(div);
-    consoleOutput.scrollTop = consoleOutput.scrollHeight;
 }
 
 function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-let commandHistory = [];
-let historyIndex = -1;
-
+// Input Handling
 consoleInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         if (!currentSessionId) return;
-
         const command = consoleInput.value;
 
-        // Echo input locally for immediate feedback 
-        // (Python interactive shell typically echoes input, but if we write to stdin, 
-        // we usually need to display what we typed)
-        const echoDiv = document.createElement('div');
-        // Use innerHTML for the prompt styling
-        echoDiv.innerHTML = `<span class="text-idle-keyword font-bold mr-2">>>></span><span>${escapeHtml(command)}</span>`;
-        consoleOutput.appendChild(echoDiv);
-
-        // Send to Main
+        // Send to Main (it will echo back as 'input' type)
         ipcRenderer.send('session-input', currentSessionId, command);
 
-        commandHistory.push(command);
-        historyIndex = commandHistory.length;
+        // Clear input
         consoleInput.value = '';
-        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        ipcRenderer.send('session-input-draft', currentSessionId, ''); // Clear draft
+
     } else if (e.key === 'ArrowUp') {
         if (historyIndex > 0) {
             historyIndex--;
-            consoleInput.value = commandHistory[historyIndex];
+            consoleInput.value = commandHistory[historyIndex] || '';
+            // Update draft? No, draft is for manual typing.
         }
     } else if (e.key === 'ArrowDown') {
         if (historyIndex < commandHistory.length - 1) {
             historyIndex++;
-            consoleInput.value = commandHistory[historyIndex];
+            consoleInput.value = commandHistory[historyIndex] || '';
         } else {
             historyIndex = commandHistory.length;
             consoleInput.value = '';
@@ -93,8 +125,14 @@ consoleInput.addEventListener('keydown', (e) => {
     }
 });
 
+// Draft saving
+consoleInput.addEventListener('input', () => {
+    if (currentSessionId) {
+        ipcRenderer.send('session-input-draft', currentSessionId, consoleInput.value);
+    }
+});
+
 clearConsoleBtn.addEventListener('click', () => {
-    // Just clear local view
     consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
 });
 

@@ -716,31 +716,97 @@ if (hideConsoleBtn) {
 }
 
 // --- IPC Output Listeners ---
-ipcRenderer.on('session-output', (event, sessionId, data) => {
-    // Find console by ID or create if not exists? No, should exist.
-    // If not exists, maybe it was created by pop-out and we don't have it?
-    // We only care if we are in Main Window and we have this console in our list.
+ipcRenderer.on('session-output', (event, sessionId, entry) => {
     const consoleData = consoles.find(c => c.id === sessionId);
     if (!consoleData) return;
 
-    // Append to history
-    // We can't strictly modify history if we only get chunks.
-    // But we are building history string locally too for quick switch.
-    // Wait, Main process has history.
-    // We should just append to DOM if active.
+    if (entry.type === 'input') {
+        const html = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapeHtml(entry.text)}</span></div>`;
+        consoleData.history += html;
+        if (activeConsoleId === sessionId) {
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        // Local command history tracking
+        consoleData.commandHistory.push(entry.text);
+        consoleData.historyIndex = consoleData.commandHistory.length;
+    } else {
+        let colorClass = 'text-gray-800';
+        if (entry.type === 'stdout') colorClass = 'text-blue-600';
+        else if (entry.type === 'stderr') colorClass = 'text-red-500';
+        else if (entry.type === 'meta') colorClass = 'text-gray-500 italic';
 
-    // We need to keep local history in sync for switching.
-    // Use appendConsoleData to handle DOM and history?
-    // Let's check appendConsoleData implementation later.
-    // For now, assume it updates DOM.
-    // We should rely on it.
-    appendConsoleData(consoleData, data, 'text-gray-800');
+        const html = `<div class="${colorClass} whitespace-pre-wrap break-all">${escapeHtml(entry.text)}</div>`;
+        consoleData.history += html;
+
+        if (activeConsoleId === sessionId) {
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            consoleOutput.appendChild(div.firstElementChild || div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+    }
 });
 
 ipcRenderer.on('session-exit', (event, sessionId, code) => {
     const consoleData = consoles.find(c => c.id === sessionId);
     if (!consoleData) return;
-    appendConsoleData(consoleData, `\n[Process exited with code ${code}]\n`, 'text-gray-500');
+    const html = `<div class="text-gray-500 italic whitespace-pre-wrap break-all">\n[Process exited with code ${code}]\n</div>`;
+    consoleData.history += html;
+    if (activeConsoleId === sessionId) {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        consoleOutput.appendChild(div.firstElementChild || div);
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+});
+
+ipcRenderer.on('session-history', (event, sessionId, historyArr, cmdHistory, draft) => {
+    const consoleData = consoles.find(c => c.id === sessionId);
+    if (!consoleData) return;
+
+    let fullHtml = '';
+    if (Array.isArray(historyArr)) {
+        historyArr.forEach(entry => {
+            if (entry.type === 'input') {
+                fullHtml += `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapeHtml(entry.text)}</span></div>`;
+            } else {
+                let colorClass = 'text-gray-800';
+                if (entry.type === 'stdout') colorClass = 'text-blue-600';
+                else if (entry.type === 'stderr') colorClass = 'text-red-500';
+                else if (entry.type === 'meta') colorClass = 'text-gray-500 italic';
+                fullHtml += `<div class="${colorClass} whitespace-pre-wrap break-all">${escapeHtml(entry.text)}</div>`;
+            }
+        });
+    }
+    consoleData.history = fullHtml;
+
+    if (Array.isArray(cmdHistory)) {
+        consoleData.commandHistory = cmdHistory;
+        consoleData.historyIndex = cmdHistory.length;
+    }
+
+    // Restore draft
+    if (activeConsoleId === sessionId && draft) {
+        consoleInput.value = draft;
+    }
+
+    if (activeConsoleId === sessionId) {
+        consoleOutput.innerHTML = consoleData.history;
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+});
+
+ipcRenderer.on('session-input-draft', (event, sessionId, draft) => {
+    const consoleData = consoles.find(c => c.id === sessionId);
+    if (!consoleData) return;
+
+    consoleData.inputDraft = draft;
+    if (activeConsoleId === sessionId) {
+        consoleInput.value = draft;
+    }
 });
 
 
@@ -762,6 +828,7 @@ function createConsole(name = null, filePath = null) {
         history: '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>',
         commandHistory: [],
         historyIndex: -1,
+        inputDraft: '',
         filePath
     };
 
@@ -806,6 +873,7 @@ function switchConsole(id) {
     activeConsoleId = id;
     consoleOutput.innerHTML = target.history;
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    consoleInput.value = target.inputDraft || '';
 
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
 
@@ -920,50 +988,46 @@ consoleInput.addEventListener('keydown', (e) => {
         if (!currentConsole) return;
 
         const command = consoleInput.value;
-        const escapedCommand = escapeHtml(command);
 
-        // Echo command
-        const echoHtml = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapedCommand}</span></div>`;
-        currentConsole.history += echoHtml;
+        // Send to Main (it will echo back as 'input' type which we render)
+        ipcRenderer.send('session-input', currentConsole.id, command);
 
-        // Render Echo
-        const echoDiv = document.createElement('div');
-        echoDiv.className = "mt-1";
-        echoDiv.innerHTML = `<span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapedCommand}</span>`;
-        consoleOutput.appendChild(echoDiv);
-
-        if (currentConsole /* && currentConsole.process */) {
-            // Send to Main
-            ipcRenderer.send('session-input', currentConsole.id, command);
-        } else {
-            // Restart? 
-            // We assume session exists if console exists.
-            // If session died, Main notifies us via 'session-exit'.
-            // But if we want auto-restart:
-            // Let's try sending input. If main finds no session, it ignores.
-            ipcRenderer.send('session-input', currentConsole.id, command);
-        }
-
-        currentConsole.commandHistory.push(command);
-        currentConsole.historyIndex = currentConsole.commandHistory.length;
+        // Clear input and draft
         consoleInput.value = '';
+        currentConsole.inputDraft = '';
+        ipcRenderer.send('session-input-draft', currentConsole.id, '');
+
+        // Command history is updated when we receive the echo back in session-output
+
+        // Reset scroll?
         consoleOutput.scrollTop = consoleOutput.scrollHeight;
     } else if (e.key === 'ArrowUp') {
         const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole && currentConsole.historyIndex > 0) {
             currentConsole.historyIndex--;
-            consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex];
+            consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex] || '';
+            // Update draft? No.
         }
     } else if (e.key === 'ArrowDown') {
         const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole) {
             if (currentConsole.historyIndex < currentConsole.commandHistory.length - 1) {
                 currentConsole.historyIndex++;
-                consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex];
+                consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex] || '';
             } else {
                 currentConsole.historyIndex = currentConsole.commandHistory.length;
                 consoleInput.value = '';
             }
+        }
+    }
+});
+
+consoleInput.addEventListener('input', () => {
+    if (activeConsoleId) {
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
+        if (currentConsole) {
+            currentConsole.inputDraft = consoleInput.value;
+            ipcRenderer.send('session-input-draft', currentConsole.id, consoleInput.value);
         }
     }
 });
