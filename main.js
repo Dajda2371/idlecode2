@@ -427,7 +427,18 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     });
 
     pyProcess.stderr.on('data', (data) => {
-        const str = data.toString();
+        let str = data.toString();
+        // Python interactive mode sends prompts to stderr.
+        // We render our own prompts in the UI when input is sent.
+
+        // Filter out prompts
+        if (str === '>>> ' || str === '>>>' || str === '... ' || str === '...') return;
+
+        // Sometimes prompt comes with other text or newlines, but usually isolated in interactive mode -i
+        // If we really want to strip prompts from beginning of stderr lines:
+        // str = str.replace(/^>>> /gm, '').replace(/^\.\.\. /gm, '');
+        // if (!str) return;
+
         const entry = { type: 'stderr', text: str };
         session.history.push(entry);
         broadcastToSession(sessionId, 'session-output', entry);
