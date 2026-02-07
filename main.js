@@ -43,7 +43,6 @@ function createWindow() {
                 { label: 'Recent Folders', submenu: [{ label: 'No Recent Folders', enabled: false }] },
                 { type: 'separator' },
                 { label: 'Open Module...', accelerator: 'Alt+M' },
-                { type: 'separator' },
                 { label: 'Module Browser', accelerator: 'Alt+C' },
                 { label: 'Path Browser' },
                 { type: 'separator' },
@@ -128,6 +127,7 @@ function createWindow() {
                 { label: '*IDLE Shell 3.13.12*' },
                 { type: 'separator' },
                 { label: 'Explorer', type: 'checkbox', checked: true },
+                { label: 'Console', type: 'checkbox', checked: true },
                 { label: 'AI Agent', type: 'checkbox', checked: true }
             ]
         },

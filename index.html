@@ -87,7 +87,10 @@
         <aside
             class="w-[260px] bg-[var(--explorer-bg)] border-r border-[var(--sidebar-border)] flex flex-col font-sans select-none">
             <div class="px-3 py-2 flex items-center justify-between">
-                <span class="text-[11px] font-bold text-gray-600 tracking-wider">EXPLORER</span>
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined">close</span>
+                    <span class="text-[11px] font-bold text-gray-600 tracking-wider">EXPLORER</span>
+                </div>
                 <span class="material-symbols-outlined text-gray-600 cursor-pointer">more_horiz</span>
             </div>
             <div class="overflow-y-auto flex-1" id="file-tree">
@@ -109,7 +112,10 @@
                 id="console-area">
                 <div
                     class="bg-gray-100 px-2 py-1 text-xs text-gray-500 border-b border-gray-200 flex justify-between select-none">
-                    <span>Interactive Console</span>
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined">close</span>
+                        <span>Interactive Console</span>
+                    </div>
                     <span class="cursor-pointer hover:text-red-500" id="clear-console-btn">Clear</span>
                 </div>
                 <div class="flex-1 overflow-y-auto p-2" id="console-output">
