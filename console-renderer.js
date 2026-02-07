@@ -1,48 +1,50 @@
-const { spawn } = require('child_process');
 const { ipcRenderer } = require('electron');
 
-let pythonProcess = null;
+let currentSessionId = null;
 const consoleOutput = document.getElementById('console-output');
 const consoleInput = document.getElementById('console-input');
 const clearConsoleBtn = document.getElementById('clear-console-btn');
 
-function initPythonShell(args = ['-i', '-u']) {
-    if (pythonProcess) pythonProcess.kill();
+// --- IPC Listeners ---
 
-    pythonProcess = spawn('python3', args);
-
-    pythonProcess.stdout.on('data', (data) => {
-        appendConsoleOutput(data.toString(), 'text-blue-600');
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-        const text = data.toString();
-        // Ignore generic prompts if needed, but for now we might show them or filter
-        if (text.trim() === '>>>' || text.trim() === '...') return;
-        appendConsoleOutput(text, 'text-red-500');
-    });
-
-    pythonProcess.on('close', (code) => {
-        appendConsoleOutput(`\nProcess exited with code ${code}\n`, 'text-gray-500');
-        pythonProcess = null;
-    });
-}
-
-ipcRenderer.on('run-file', (event, filePath) => {
-    consoleOutput.innerHTML = '';
-    const div = document.createElement('div');
-    div.className = 'text-gray-500 mb-1';
-    div.textContent = `=== RESTART: ${filePath} ===`;
-    consoleOutput.appendChild(div);
-
-    // Run with file path
-    initPythonShell(['-i', '-u', filePath]);
+// 1. Attach to a session (sent by Main when popping out)
+ipcRenderer.on('attach-to-session', (event, sessionId) => {
+    currentSessionId = sessionId;
+    ipcRenderer.send('session-attach', sessionId);
 });
+
+// 2. Receive session history (on attach)
+ipcRenderer.on('session-history', (event, sessionId, history) => {
+    if (sessionId !== currentSessionId) return;
+    consoleOutput.innerHTML = ''; // Clear initial "Ready" message
+
+    // History is raw text aggregation. 
+    // We wrap it in a div to preserve whitespace.
+    const div = document.createElement('div');
+    div.className = 'whitespace-pre-wrap break-all text-gray-800';
+    div.innerText = history;
+    consoleOutput.appendChild(div);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+});
+
+// 3. Receive live output
+ipcRenderer.on('session-output', (event, sessionId, data) => {
+    if (sessionId !== currentSessionId) return;
+    appendConsoleOutput(data, 'text-gray-800');
+});
+
+// 4. Session exited
+ipcRenderer.on('session-exit', (event, sessionId, code) => {
+    if (sessionId !== currentSessionId) return;
+    appendConsoleOutput(`\n[Process exited with code ${code}]\n`, 'text-gray-500');
+});
+
+// --- UI Logic ---
 
 function appendConsoleOutput(text, colorClass) {
     const div = document.createElement('div');
     div.className = `${colorClass} whitespace-pre-wrap break-all`;
-    div.textContent = text;
+    div.innerText = text; // Usage of innerText handles escaping for us generally
     consoleOutput.appendChild(div);
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
 }
@@ -56,19 +58,20 @@ let historyIndex = -1;
 
 consoleInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
+        if (!currentSessionId) return;
+
         const command = consoleInput.value;
 
+        // Echo input locally for immediate feedback 
+        // (Python interactive shell typically echoes input, but if we write to stdin, 
+        // we usually need to display what we typed)
         const echoDiv = document.createElement('div');
+        // Use innerHTML for the prompt styling
         echoDiv.innerHTML = `<span class="text-idle-keyword font-bold mr-2">>>></span><span>${escapeHtml(command)}</span>`;
         consoleOutput.appendChild(echoDiv);
 
-        if (pythonProcess) {
-            pythonProcess.stdin.write(command + '\n');
-        } else {
-            appendConsoleOutput('Python process is not running. Restarting...', 'text-gray-500');
-            initPythonShell();
-            if (pythonProcess) pythonProcess.stdin.write(command + '\n');
-        }
+        // Send to Main
+        ipcRenderer.send('session-input', currentSessionId, command);
 
         commandHistory.push(command);
         historyIndex = commandHistory.length;
@@ -91,13 +94,8 @@ consoleInput.addEventListener('keydown', (e) => {
 });
 
 clearConsoleBtn.addEventListener('click', () => {
+    // Just clear local view
     consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
 });
 
-// Focus input on load
 consoleInput.focus();
-// Only init generic shell if NOT running a file immediately?
-// But run-file comes later via IPC.
-// So safe to init generic shell first, then restart if run-file comes.
-initPythonShell();
-

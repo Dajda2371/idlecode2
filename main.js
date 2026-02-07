@@ -385,6 +385,129 @@ ipcMain.on('new-console-window', () => {
     });
 });
 
+// --- Session Management ---
+const { spawn } = require('child_process');
+const sessions = new Map();
+
+// Helper: Broadcast to all windows listening to a session
+function broadcastToSession(sessionId, channel, ...args) {
+    const session = sessions.get(sessionId);
+    if (!session) return;
+
+    session.listeners.forEach(wc => {
+        if (!wc.isDestroyed()) {
+            wc.send(channel, sessionId, ...args);
+        }
+    });
+}
+
+ipcMain.on('session-create', (event, sessionId, filePath) => {
+    if (sessions.has(sessionId)) return;
+
+    // Spawn Python Process
+    let pythonPath = 'python3'; // Default
+    if (process.platform === 'win32') pythonPath = 'python';
+
+    const args = ['-u']; // Unbuffered
+    if (filePath) args.push(filePath);
+    else args.push('-i'); // Interactive mode if no file
+
+    const pyProcess = spawn(pythonPath, args);
+
+    const session = {
+        id: sessionId,
+        process: pyProcess,
+        history: '', // Store output history
+        listeners: new Set()
+    };
+
+    sessions.set(sessionId, session);
+
+    // Handle Output
+    pyProcess.stdout.on('data', (data) => {
+        const str = data.toString();
+        session.history += str;
+        broadcastToSession(sessionId, 'session-output', str);
+    });
+
+    pyProcess.stderr.on('data', (data) => {
+        const str = data.toString();
+        session.history += str; // Combine stderr into history
+        broadcastToSession(sessionId, 'session-output', str); // sending everything as output for now
+    });
+
+    pyProcess.on('close', (code) => {
+        session.history += `\n[Process exited with code ${code}]\n`;
+        broadcastToSession(sessionId, 'session-exit', code);
+        sessions.delete(sessionId);
+    });
+});
+
+ipcMain.on('session-input', (event, sessionId, input) => {
+    const session = sessions.get(sessionId);
+    if (session && session.process) {
+        session.process.stdin.write(input + '\n');
+    }
+});
+
+ipcMain.on('session-kill', (event, sessionId) => {
+    const session = sessions.get(sessionId);
+    if (session && session.process) {
+        session.process.kill();
+        sessions.delete(sessionId);
+    }
+});
+
+ipcMain.on('session-attach', (event, sessionId) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+        session.listeners.add(event.sender);
+        // Send history upon attach
+        event.sender.send('session-history', sessionId, session.history);
+
+        // Remove listener when window closes (sender destroyed)
+        event.sender.once('destroyed', () => {
+            if (sessions.has(sessionId)) {
+                sessions.get(sessionId).listeners.delete(event.sender);
+            }
+        });
+    }
+});
+
+ipcMain.on('session-detach', (event, sessionId) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+        session.listeners.delete(event.sender);
+    }
+});
+
+// Updated Pop-out Logic: Open window for EXISTING session
+ipcMain.on('pop-out-session', (event, sessionId, title) => {
+    const subWin = new BrowserWindow({
+        width: 800,
+        height: 600,
+        title: title || `Shell ${sessionId}`,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+
+    subWin.loadFile('console.html');
+    poppedConsoles.push(subWin);
+
+    // Pass session ID to the new window
+    subWin.webContents.once('did-finish-load', () => {
+        subWin.webContents.send('attach-to-session', sessionId);
+    });
+
+    subWin.on('closed', () => {
+        const idx = poppedConsoles.indexOf(subWin);
+        if (idx > -1) poppedConsoles.splice(idx, 1);
+    });
+});
+
+
 ipcMain.on('close-popped-consoles', () => {
     poppedConsoles.forEach(w => w.close());
     poppedConsoles = [];
@@ -397,5 +520,6 @@ ipcMain.on('update-menu-checkbox', (event, menuId, checked) => {
         item.checked = checked;
     }
 });
+
 
 

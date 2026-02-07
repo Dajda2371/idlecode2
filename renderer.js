@@ -715,6 +715,35 @@ if (hideConsoleBtn) {
     };
 }
 
+// --- IPC Output Listeners ---
+ipcRenderer.on('session-output', (event, sessionId, data) => {
+    // Find console by ID or create if not exists? No, should exist.
+    // If not exists, maybe it was created by pop-out and we don't have it?
+    // We only care if we are in Main Window and we have this console in our list.
+    const consoleData = consoles.find(c => c.id === sessionId);
+    if (!consoleData) return;
+
+    // Append to history
+    // We can't strictly modify history if we only get chunks.
+    // But we are building history string locally too for quick switch.
+    // Wait, Main process has history.
+    // We should just append to DOM if active.
+
+    // We need to keep local history in sync for switching.
+    // Use appendConsoleData to handle DOM and history?
+    // Let's check appendConsoleData implementation later.
+    // For now, assume it updates DOM.
+    // We should rely on it.
+    appendConsoleData(consoleData, data, 'text-gray-800');
+});
+
+ipcRenderer.on('session-exit', (event, sessionId, code) => {
+    const consoleData = consoles.find(c => c.id === sessionId);
+    if (!consoleData) return;
+    appendConsoleData(consoleData, `\n[Process exited with code ${code}]\n`, 'text-gray-500');
+});
+
+
 function createConsole(name = null, filePath = null) {
     // Calculate next ID strictly based on max + 1
     let newId = 1;
@@ -729,15 +758,18 @@ function createConsole(name = null, filePath = null) {
     const consoleData = {
         id,
         name,
-        process: null,
-        history: '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>', // HTML history
+        // process: null, // No local process
+        history: '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>',
         commandHistory: [],
         historyIndex: -1,
         filePath
     };
 
     consoles.push(consoleData);
-    spawnConsoleProcess(consoleData, filePath);
+
+    // Request Main to create session
+    ipcRenderer.send('session-create', id, filePath);
+    ipcRenderer.send('session-attach', id);
 
     // Switch to new console immediately
     switchConsole(id);
@@ -745,44 +777,26 @@ function createConsole(name = null, filePath = null) {
     return consoleData;
 }
 
+// Replaced spawnConsoleProcess with IPC
 function spawnConsoleProcess(consoleData, filePath = null) {
-    if (consoleData.process) {
-        try { consoleData.process.kill(); } catch (e) { }
-    }
-
-    const args = filePath ? ['-i', '-u', filePath] : ['-i', '-u'];
-    // If restarting with file, update name + history header
+    // If resetting existing console
     if (filePath) {
+        // Kill existing session in Main?
+        // Or just detatch and create new one with same ID?
+        // Reuse ID.
+        ipcRenderer.send('session-kill', consoleData.id);
         consoleData.name = `Run: ${path.basename(filePath)}`;
         consoleData.filePath = filePath;
         consoleData.history += `<div class="text-gray-500 mb-1 mt-2">=== RESTART: ${filePath} ===</div>`;
+
+        ipcRenderer.send('session-create', consoleData.id, filePath);
+        ipcRenderer.send('session-attach', consoleData.id);
+
         if (activeConsoleId === consoleData.id) {
-            updateConsoleDOM(consoleData);
+            consoleOutput.innerHTML = consoleData.history;
+            if (activeConsoleTitle) activeConsoleTitle.textContent = consoleData.name;
         }
     }
-
-    const proc = spawn('python3', args);
-    consoleData.process = proc;
-
-    proc.stdout.on('data', (data) => {
-        appendConsoleData(consoleData, data.toString(), 'text-blue-600');
-    });
-
-    proc.stderr.on('data', (data) => {
-        const text = data.toString();
-        if (text.trim() === '>>>' || text.trim() === '...') return;
-        appendConsoleData(consoleData, text, 'text-red-500');
-    });
-
-    proc.on('close', (code) => {
-        appendConsoleData(consoleData, `\nProcess exited with code ${code}\n`, 'text-gray-500');
-        consoleData.process = null;
-        renderConsoleList(); // Update status icon if we add one
-
-        // Auto-restart simple shell? No, IDLE doesn't auto-restart dead shell unless requested.
-        // It shows the prompt usually.
-        appendConsoleData(consoleData, `\n>>> `, 'text-[var(--idle-keyword)] font-bold');
-    });
 }
 
 function switchConsole(id) {
@@ -804,7 +818,10 @@ function closeConsole(id) {
     if (idx === -1) return;
 
     const target = consoles[idx];
-    if (target.process) target.process.kill();
+    // ipcRenderer.send('session-kill', id); // Logic: closing tab kills session?
+    // User requested "hidden console pops out".
+    // But this is "close console" (delete). Yes, delete should kill.
+    ipcRenderer.send('session-kill', id);
 
     consoles.splice(idx, 1);
 
@@ -826,6 +843,7 @@ function closeConsole(id) {
         }
     }
 }
+
 
 function renderConsoleList() {
     consoleList.innerHTML = '';
@@ -914,12 +932,16 @@ consoleInput.addEventListener('keydown', (e) => {
         echoDiv.innerHTML = `<span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapedCommand}</span>`;
         consoleOutput.appendChild(echoDiv);
 
-        if (currentConsole.process) {
-            currentConsole.process.stdin.write(command + '\n');
+        if (currentConsole /* && currentConsole.process */) {
+            // Send to Main
+            ipcRenderer.send('session-input', currentConsole.id, command);
         } else {
-            appendConsoleData(currentConsole, 'Python process is not running. Restarting...', 'text-gray-500');
-            spawnConsoleProcess(currentConsole, currentConsole.filePath);
-            if (currentConsole.process) currentConsole.process.stdin.write(command + '\n');
+            // Restart? 
+            // We assume session exists if console exists.
+            // If session died, Main notifies us via 'session-exit'.
+            // But if we want auto-restart:
+            // Let's try sending input. If main finds no session, it ignores.
+            ipcRenderer.send('session-input', currentConsole.id, command);
         }
 
         currentConsole.commandHistory.push(command);
