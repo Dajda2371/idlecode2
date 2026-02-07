@@ -665,15 +665,10 @@ const addConsoleBtn = document.getElementById('add-console-btn');
 const activeConsoleTitle = document.getElementById('active-console-title');
 
 function createConsole(name = null, filePath = null) {
-    // Calculate next ID by finding the first gap
+    // Calculate next ID strictly based on max + 1
     let newId = 1;
-    const existingIds = consoles.map(c => c.id).sort((a, b) => a - b);
-    for (const existingId of existingIds) {
-        if (existingId === newId) {
-            newId++;
-        } else {
-            break;
-        }
+    if (consoles.length > 0) {
+        newId = Math.max(...consoles.map(c => c.id)) + 1;
     }
 
     // Default name
