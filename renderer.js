@@ -1040,6 +1040,59 @@ clearConsoleBtn.addEventListener('click', () => {
     }
 });
 
+// Prompt Handling
+ipcRenderer.on('session-prompt', (event, sessionId, type) => {
+    const consoleData = consoles.find(c => c.id === sessionId);
+    if (!consoleData) return;
+
+    // We can store indentation state in consoleData if needed
+    if (!consoleData.indentLevel) consoleData.indentLevel = 0;
+
+    if (type === 'standard') {
+        consoleData.indentLevel = 0;
+        consoleData.promptText = '>>>';
+    } else if (type === 'continuation') {
+        // Calculate Indent
+        const lastCmd = consoleData.commandHistory[consoleData.commandHistory.length - 1] || '';
+
+        // Count leading 4-space tabs
+        // Simplistic assumption: 4 spaces = 1 indent
+        const currentIndent = Math.floor((lastCmd.match(/^ */)[0].length) / 4);
+
+        let newIndent = currentIndent;
+        if (lastCmd.trim().endsWith(':')) {
+            newIndent = currentIndent + 1;
+        }
+        // Basic dedent logic could be here: return/break etc. But let's trust user to dedent manually or start naive.
+
+        consoleData.indentLevel = newIndent;
+
+        // "1 . . .", "2 . . ."
+        if (newIndent > 0) {
+            consoleData.promptText = `${newIndent} . . .`;
+        } else {
+            consoleData.promptText = '...';
+        }
+    }
+
+    // Update UI if active
+    if (activeConsoleId === sessionId) {
+        if (consolePrompt) consolePrompt.innerText = consoleData.promptText;
+
+        // Auto-indent input
+        if (type === 'continuation' && consoleData.indentLevel > 0) {
+            // Only if input is empty? User might have started typing if there's lag.
+            // Better to prepend or set if empty.
+            if (!consoleInput.value) {
+                consoleInput.value = '    '.repeat(consoleData.indentLevel);
+                // Move cursor to end (browsers usually do this on value set, but to be sure)
+            }
+        } else if (type === 'standard') {
+            // Maybe clear input? Usually main clears it on sending.
+        }
+    }
+});
+
 if (addConsoleBtn) {
     addConsoleBtn.addEventListener('click', () => {
         createConsole();

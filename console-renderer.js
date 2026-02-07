@@ -7,6 +7,7 @@ const clearConsoleBtn = document.getElementById('clear-console-btn');
 
 let commandHistory = [];
 let historyIndex = -1;
+let currentPromptText = '>>>';
 
 // --- IPC Listeners ---
 
@@ -81,8 +82,18 @@ function appendEntry(entry) {
         // Render as prompt echo
         const div = document.createElement('div');
         div.className = "mt-1";
-        // Use innerHTML for prompt styling, escape text
-        div.innerHTML = `<span class="text-idle-keyword font-bold mr-2">>>></span><span>${escapeHtml(entry.text)}</span>`;
+        // Use currentPromptText which reflects the prompt active when this input was typed
+        // Note: This relies on currentPromptText not changing before echo arrives.
+        // Echo arrives immediately on Enter from Renderer->Main->Renderer (instant).
+
+        let promptHtml = `<span class="text-idle-keyword font-bold mr-2 select-none">${currentPromptText}</span>`;
+        if (currentPromptText !== '>>>') {
+            // Maybe different style for indentation prompt? IDLE usually keeps color.
+            // But "1 . . ." usually is just text.
+            promptHtml = `<span class="text-idle-keyword font-bold mr-2 select-none">${currentPromptText}</span>`;
+        }
+
+        div.innerHTML = `${promptHtml}<span>${escapeHtml(entry.text)}</span>`;
         consoleOutput.appendChild(div);
         return;
     }
@@ -150,6 +161,58 @@ window.addEventListener('beforeunload', () => {
 
 clearConsoleBtn.addEventListener('click', () => {
     consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
+});
+
+// Prompt Handling
+let currentIndentLevel = 0;
+
+ipcRenderer.on('session-prompt', (event, sessionId, type) => {
+    if (sessionId !== currentSessionId) return;
+
+    // Find prompt element
+    // console-renderer.js renders prompts differently?
+    // In console-renderer, we render echo lines via 'appendEntry({type:'input'})' which has hardcoded '>>>'.
+    // We need to change that to dynamic prompt.
+    // And we need to change CURRENT prompt which is effectively just 'consoleInput' placeholder/styling?
+    // Wait, console-renderer.js has this HTML structure:
+    // <span class="text-idle-keyword ...">>>></span> <input ...>
+    // We need to target that span. Let's give it an ID first in console.html or find it here.
+
+    const promptSpan = document.querySelector('.text-idle-keyword.font-bold.mr-2.select-none'); // Roughly
+
+    if (type === 'standard') {
+        currentIndentLevel = 0;
+        currentPromptText = '>>>';
+        if (promptSpan) promptSpan.innerText = '>>>';
+        consoleInput.value = '';
+    } else if (type === 'continuation') {
+        // Calculate based on history
+        // Access 'commandHistory' in this scope
+        const lastCmd = commandHistory[commandHistory.length - 1] || '';
+
+        let spaces = 0;
+        const match = lastCmd.match(/^ */);
+        if (match) spaces = match[0].length;
+
+        let indents = Math.floor(spaces / 4);
+
+        if (lastCmd.trim().endsWith(':')) {
+            indents += 1;
+        }
+
+        currentIndentLevel = indents;
+
+        let promptText = '...';
+        if (indents > 0) promptText = `${indents} . . .`;
+
+        currentPromptText = promptText;
+        if (promptSpan) promptSpan.innerText = promptText;
+
+        // Auto-fill input
+        if (indents > 0) {
+            consoleInput.value = '    '.repeat(indents);
+        }
+    }
 });
 
 consoleInput.focus();
