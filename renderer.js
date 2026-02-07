@@ -750,8 +750,14 @@ function closeConsole(id) {
     consoles.splice(idx, 1);
 
     if (consoles.length === 0) {
-        // Create a default one if all closed
-        createConsole();
+        // Reset ID
+        activeConsoleId = null;
+        nextConsoleId = 1;
+
+        // Clear UI
+        consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
+        if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
+        renderConsoleList();
     } else {
         if (activeConsoleId === id) {
             // Switch to previous or first
