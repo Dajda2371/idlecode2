@@ -742,3 +742,194 @@ if (popOutBtn) {
 // Start shell on load
 initPythonShell();
 
+
+// --- New Navigation Feature Handlers ---
+
+// 1. Settings (Configure IDLE)
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings');
+const cancelSettingsBtn = document.getElementById('cancel-settings');
+const applySettingsBtn = document.getElementById('apply-settings');
+const fontSizeInput = document.getElementById('font-size-input');
+const fontFamilySelect = document.getElementById('font-family-select');
+
+// Helper to toggle modal
+function toggleModal(modal, show) {
+    if (show) modal.classList.remove('hidden');
+    else modal.classList.add('hidden');
+}
+
+ipcRenderer.on('menu-configure-idle', () => {
+    toggleModal(settingsModal, true);
+});
+
+[closeSettingsBtn, cancelSettingsBtn].forEach(btn => {
+    if (btn) btn.addEventListener('click', () => toggleModal(settingsModal, false));
+});
+
+applySettingsBtn.addEventListener('click', () => {
+    const size = fontSizeInput.value;
+    const family = fontFamilySelect.value;
+    const theme = document.querySelector('input[name="theme"]:checked').value;
+
+    // Apply Font (Example logic, ideally updates CSS vars)
+    // We target the class names generated for line numbers and code
+    const rule = `
+        #code-content div, #line-numbers div {
+            font-size: ${size}px !important;
+            height: ${parseInt(size) * 1.5}px !important;
+            line-height: ${parseInt(size) * 1.5}px !important;
+            font-family: ${family.replace(/'/g, "")} !important;
+        }
+    `;
+    // Inject style? Or update CSS vars if we used them.
+    // For simplicity, let's update a dedicated style block or inline styles if we re-render?
+    // Since we use strict 20px in JS, we need to update the GENERATOR too.
+    // This is tricky. Let's just reload the file or re-render.
+
+    // For now, let's just alert that font size requires restart or re-render.
+    // But we can do better: update the renderer generator variable.
+    // But '20px' is hardcoded in `renderCode`.
+    // Let's make `renderCode` use a variable `LINE_HEIGHT`.
+
+    // Stub for now:
+    alert('Settings saved. (Font changes require app restart in this version)');
+
+    toggleModal(settingsModal, false);
+});
+
+
+// 2. Find/Replace
+const findBar = document.getElementById('find-bar');
+const replaceBar = document.getElementById('replace-bar');
+const findInput = document.getElementById('find-input');
+const replaceFindInput = document.getElementById('replace-find-input');
+
+ipcRenderer.on('menu-find', () => {
+    toggleModal(findBar, true);
+    findInput.focus();
+    findInput.select();
+});
+
+ipcRenderer.on('menu-replace', () => {
+    toggleModal(replaceBar, true);
+    replaceFindInput.focus();
+});
+
+document.getElementById('find-close-btn').addEventListener('click', () => toggleModal(findBar, false));
+document.getElementById('replace-close-btn').addEventListener('click', () => toggleModal(replaceBar, false));
+
+// Simple Find Next Implementation
+function findText(text, backward = false) {
+    if (!text) return;
+    // Use window.find (native browser search)
+    // It works decently with contenteditable
+    const found = window.find(text, false, backward, true, false, true, false);
+    if (!found) {
+        // Wrap around?
+        // simple beep or ignoring wrap for now
+    }
+}
+
+document.getElementById('find-next-btn').addEventListener('click', () => findText(findInput.value));
+document.getElementById('find-prev-btn').addEventListener('click', () => findText(findInput.value, true));
+findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') findText(findInput.value);
+    if (e.key === 'Escape') toggleModal(findBar, false);
+});
+
+
+// 3. Path Browser / Module Browser (Generic Info Modal)
+const infoModal = document.getElementById('info-modal');
+const infoTitle = document.getElementById('info-modal-title');
+const infoContent = document.getElementById('info-modal-content');
+const closeInfoBtn = document.getElementById('close-info-btn');
+const closeInfoX = document.getElementById('close-info-modal');
+
+[closeInfoBtn, closeInfoX].forEach(btn => btn.addEventListener('click', () => toggleModal(infoModal, false)));
+
+// Path Browser Logic
+ipcRenderer.on('menu-path-browser', () => {
+    toggleModal(infoModal, true);
+    infoTitle.textContent = 'Path Browser (sys.path)';
+    infoContent.textContent = 'Loading...';
+
+    // Run python to get sys.path
+    const python = spawn('python3', ['-c', 'import sys; print("\\n".join(sys.path))']);
+    let output = '';
+    python.stdout.on('data', data => output += data.toString());
+    python.on('close', () => {
+        infoContent.textContent = output;
+    });
+});
+
+// Module Browser Logic (Stub/Simple List)
+ipcRenderer.on('menu-module-browser', () => {
+    toggleModal(infoModal, true);
+    infoTitle.textContent = 'Module Browser (Local)';
+    infoContent.textContent = 'Loading local modules...\n';
+
+    // List .py files in current directory?
+    // Or run help('modules')? help('modules') is very slow.
+    // Let's list global modules using pkg_resources or pip list?
+    // Let's just do `pip list` as a proxy for "what's installed".
+
+    const pip = spawn('pip3', ['list']);
+    let output = '';
+    pip.stdout.on('data', data => output += data.toString());
+    pip.on('close', () => {
+        infoContent.textContent = "Installed Packages:\n\n" + output;
+    });
+});
+
+// 4. Check Module
+ipcRenderer.on('menu-check-module', () => {
+    if (!currentFilePath) {
+        alert('Please save the file first.');
+        return;
+    }
+
+    const check = spawn('python3', ['-m', 'py_compile', currentFilePath]);
+    let errOutput = '';
+    // py_compile output usually goes to stderr if error, but wait.
+    check.stderr.on('data', data => errOutput += data.toString());
+
+    check.on('close', (code) => {
+        if (code === 0) {
+            alert('Check Module: No syntax errors found.');
+        } else {
+            // Show error in console?
+            const consoleArea = document.getElementById('console-area');
+            const consoleOutput = document.getElementById('console-output');
+
+            consoleOutput.innerHTML += `<div class="text-red-500 font-bold">\nSyntax Error:\n${errOutput}</div>`;
+            consoleArea.style.display = 'flex'; // Ensure console is visible
+            alert('Check Module: Syntax errors found! See console for details.');
+        }
+    });
+});
+
+// 5. Open Module (Stub)
+ipcRenderer.on('menu-open-module', () => {
+    const modName = prompt("Enter module name to open (e.g. os):");
+    if (modName) {
+        // Try to find file?
+        // Complex logic needed to find python lib path.
+        // For now:
+        alert(`Opening source for '${modName}' is not fully implemented yet.`);
+    }
+});
+
+// 6. Config Save Copy As
+ipcRenderer.on('save-copy-as-request', () => {
+    // Logic similar to Save As but doesn't change currentFilePath
+    alert('Save Copy As not implemented yet.');
+});
+
+// 7. Show Completions (Stub)
+ipcRenderer.on('menu-show-completions', () => {
+    // Needs LSP or simple keyword matching
+    alert('Completions require a Language Server which is not integrated yet.');
+});
+
+

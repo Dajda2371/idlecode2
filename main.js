@@ -52,25 +52,32 @@ function createWindow() {
                 },
                 { label: 'Recent Folders', submenu: [{ label: 'No Recent Folders', enabled: false }] },
                 { type: 'separator' },
-                { label: 'Open Module...', accelerator: 'Alt+M' },
-                { label: 'Module Browser', accelerator: 'Alt+C' },
-                { label: 'Path Browser' },
+                {
+                    label: 'Open Module...',
+                    accelerator: 'Alt+M',
+                    click: () => win.webContents.send('menu-open-module')
+                },
+                {
+                    label: 'Module Browser',
+                    accelerator: 'Alt+C',
+                    click: () => win.webContents.send('menu-module-browser')
+                },
+                {
+                    label: 'Path Browser',
+                    click: () => win.webContents.send('menu-path-browser')
+                },
                 { type: 'separator' },
                 {
                     label: 'Save',
                     accelerator: 'CmdOrCtrl+S',
-                    click: () => {
-                        // Current editor is read-only, acts as a viewer
-                        // But we can trigger a 'save' event if we eventually add editing
-                        win.webContents.send('save-file')
-                    }
+                    click: () => win.webContents.send('save-file')
                 },
-                { label: 'Save As...', accelerator: 'CmdOrCtrl+Shift+S' },
-                { label: 'Save Copy As...', accelerator: 'Alt+Shift+S' },
+                { label: 'Save As...', accelerator: 'CmdOrCtrl+Shift+S', click: () => win.webContents.send('save-as-request') },
+                { label: 'Save Copy As...', accelerator: 'Alt+Shift+S', click: () => win.webContents.send('save-copy-as-request') },
                 { type: 'separator' },
                 { label: 'Auto-Save', type: 'checkbox', checked: false },
                 { type: 'separator' },
-                { label: 'Print Window', accelerator: 'CmdOrCtrl+P' },
+                { label: 'Print Window', accelerator: 'CmdOrCtrl+P', click: () => win.webContents.print() },
                 { type: 'separator' },
                 { label: 'Close Window', accelerator: 'Alt+F4', role: 'close' },
                 { label: 'Exit IDLE', accelerator: 'CmdOrCtrl+Q', role: 'quit' }
@@ -87,20 +94,28 @@ function createWindow() {
                 { label: 'Copy', accelerator: 'CmdOrCtrl+C', role: 'copy' },
                 { label: 'Paste', accelerator: 'CmdOrCtrl+V', role: 'paste' },
                 { type: 'separator' },
-                { label: 'Find...', accelerator: 'CmdOrCtrl+F' },
-                { label: 'Find Again', accelerator: 'CmdOrCtrl+G' },
-                { label: 'Find Selection', accelerator: 'CmdOrCtrl+F3' },
-                { label: 'Find in Files...', accelerator: 'Alt+F3' },
-                { label: 'Replace...', accelerator: 'CmdOrCtrl+H' },
+                {
+                    label: 'Find...',
+                    accelerator: 'CmdOrCtrl+F',
+                    click: () => win.webContents.send('menu-find')
+                },
+                { label: 'Find Again', accelerator: 'CmdOrCtrl+G', click: () => win.webContents.send('menu-find-next') },
+                { label: 'Find Selection', accelerator: 'CmdOrCtrl+F3', click: () => win.webContents.send('menu-find-selection') },
+                { label: 'Find in Files...', accelerator: 'Alt+F3', click: () => win.webContents.send('menu-find-in-files') },
+                {
+                    label: 'Replace...',
+                    accelerator: 'CmdOrCtrl+H',
+                    click: () => win.webContents.send('menu-replace')
+                },
                 { type: 'separator' },
                 {
                     label: 'Go to Line',
                     accelerator: 'Alt+G',
                     click: () => win.webContents.send('edit-goto-line')
                 },
-                { label: 'Show Completions', accelerator: 'Control+Space' },
+                { label: 'Show Completions', accelerator: 'Control+Space', click: () => win.webContents.send('menu-show-completions') },
                 { label: 'Expand Word', accelerator: 'Alt+/' },
-                { label: 'Show Call Tip', accelerator: 'CmdOrCtrl+\\' },
+                { label: 'Show Call Tip', accelerator: 'CmdOrCtrl+\\', click: () => win.webContents.send('menu-show-call-tip') },
                 { label: 'Show Surrounding Parens', accelerator: 'CmdOrCtrl+0' }
             ]
         },
@@ -154,14 +169,24 @@ function createWindow() {
                     click: () => win.webContents.send('run-module')
                 },
                 { label: 'Run... Customized', accelerator: 'Shift+F5' },
-                { label: 'Check Module', accelerator: 'Alt+X' },
-                { label: 'Python Shell' }
+                {
+                    label: 'Check Module',
+                    accelerator: 'Alt+X',
+                    click: () => win.webContents.send('menu-check-module')
+                },
+                {
+                    label: 'Python Shell',
+                    click: () => win.webContents.send('menu-python-shell')
+                }
             ]
         },
         {
             label: 'Options',
             submenu: [
-                { label: 'Configure IDLE' },
+                {
+                    label: 'Configure IDLE',
+                    click: () => win.webContents.send('menu-configure-idle')
+                },
                 { type: 'separator' },
                 { label: 'Show Code Context' },
                 {

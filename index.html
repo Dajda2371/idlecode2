@@ -109,11 +109,117 @@
         <main class="flex-1 flex flex-col bg-white border-r border-gray-200 overflow-hidden">
             <!-- Editor Area -->
             <div class="flex-1 flex overflow-auto min-h-[200px]" id="editor-area">
-                <div class="w-10 bg-white border-r border-gray-100 py-2 text-right pr-2 text-gray-400 select-none text-[13px]"
-                    id="line-numbers">
+                <div class="w-10 text-right pr-2 text-gray-400 select-none font-mono text-[13px] leading-[20px] pt-4 bg-[#f3f3f3]"
+                    id="line-numbers"></div>
+                <div class="flex-1 outline-none font-mono text-[13px] leading-[20px] whitespace-pre pl-2 pt-4"
+                    id="code-content" contenteditable="false" spellcheck="false"></div>
+                <!-- Modals (Hidden by default) -->
+
+                <!-- Configure IDLE Modal -->
+                <div id="settings-modal"
+                    class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+                    <div class="bg-white border-2 border-gray-400 p-1 shadow-xl w-[500px] text-[13px]">
+                        <div
+                            class="bg-gray-100 border-b border-gray-300 px-2 py-1 flex justify-between items-center mb-2">
+                            <span class="font-bold">IDLE Preferences</span>
+                            <button id="close-settings" class="text-gray-500 hover:text-black">X</button>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <!-- Font Tab -->
+                            <div class="border border-gray-300 p-2">
+                                <h3 class="font-bold mb-2">Fonts/Tabs</h3>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <label>Font Face:</label>
+                                    <select id="font-family-select" class="border border-gray-400 px-1">
+                                        <option value="'Courier New', Courier, monospace">Courier New</option>
+                                        <option value="'Menlo', 'Consolas', monospace">Menlo/Consolas</option>
+                                        <option value="'Fira Code', monospace">Fira Code</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label>Font Size:</label>
+                                    <input type="number" id="font-size-input" class="border border-gray-400 w-16 px-1"
+                                        value="13" min="8" max="72">
+                                </div>
+                            </div>
+
+                            <!-- Theme Tab (Simple) -->
+                            <div class="border border-gray-300 p-2">
+                                <h3 class="font-bold mb-2">Theme</h3>
+                                <div class="flex items-center gap-4">
+                                    <label><input type="radio" name="theme" value="classic" checked> IDLE
+                                        Classic</label>
+                                    <label><input type="radio" name="theme" value="dark"> IDLE Dark</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2 p-2 border-t border-gray-200 bg-gray-50">
+                            <button id="apply-settings"
+                                class="px-3 py-1 bg-gray-200 border border-gray-400 hover:bg-gray-300">Apply</button>
+                            <button id="cancel-settings"
+                                class="px-3 py-1 bg-gray-200 border border-gray-400 hover:bg-gray-300">Cancel</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex-1 p-2 text-[14px] leading-tight whitespace-pre font-mono outline-none"
-                    id="code-content" contenteditable="false">
+
+                <!-- Find/Replace Bar (Overlay) -->
+                <div id="find-bar"
+                    class="absolute top-2 right-8 bg-white border border-gray-400 shadow-md p-2 text-[12px] flex items-center gap-2 hidden z-40">
+                    <span class="font-bold text-gray-600">Find:</span>
+                    <input type="text" id="find-input"
+                        class="border border-gray-300 px-1 w-32 outline-none focus:border-blue-400">
+                    <button id="find-next-btn"
+                        class="px-2 bg-gray-100 border border-gray-300 hover:bg-gray-200">↓</button>
+                    <button id="find-prev-btn"
+                        class="px-2 bg-gray-100 border border-gray-300 hover:bg-gray-200">↑</button>
+                    <button id="find-close-btn" class="ml-2 text-gray-500 hover:text-red-500">X</button>
+                </div>
+
+                <!-- Replace Bar (Overlay) -->
+                <div id="replace-bar"
+                    class="absolute top-10 right-8 bg-white border border-gray-400 shadow-md p-2 text-[12px] flex flex-col gap-1 hidden z-40 w-[300px]">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-gray-600">Replace</span>
+                        <button id="replace-close-btn" class="text-gray-500 hover:text-red-500">X</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="w-12 text-right">Find:</label>
+                        <input type="text" id="replace-find-input"
+                            class="border border-gray-300 px-1 flex-1 outline-none">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="w-12 text-right">Rep:</label>
+                        <input type="text" id="replace-input" class="border border-gray-300 px-1 flex-1 outline-none">
+                    </div>
+                    <div class="flex justify-end gap-2 mt-2">
+                        <button id="replace-next-btn"
+                            class="px-2 bg-gray-100 border border-gray-300 hover:bg-gray-200">Find Next</button>
+                        <button id="replace-btn"
+                            class="px-2 bg-gray-100 border border-gray-300 hover:bg-gray-200">Replace</button>
+                        <button id="replace-all-btn"
+                            class="px-2 bg-gray-100 border border-gray-300 hover:bg-gray-200">Replace All</button>
+                    </div>
+                </div>
+
+                <!-- Generic Info Modal (Path Browser / Module Browser) -->
+                <div id="info-modal"
+                    class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+                    <div
+                        class="bg-white border-2 border-gray-400 p-1 shadow-xl w-[600px] h-[400px] flex flex-col text-[13px]">
+                        <div
+                            class="bg-gray-100 border-b border-gray-300 px-2 py-1 flex justify-between items-center mb-2">
+                            <span id="info-modal-title" class="font-bold">Info</span>
+                            <button id="close-info-modal" class="text-gray-500 hover:text-black">X</button>
+                        </div>
+                        <div class="flex-1 overflow-auto p-2 bg-white font-mono text-xs whitespace-pre"
+                            id="info-modal-content">
+                            <!-- Content goes here -->
+                        </div>
+                        <div class="flex justify-end gap-2 p-2 border-t border-gray-200 bg-gray-50">
+                            <button id="close-info-btn"
+                                class="px-3 py-1 bg-gray-200 border border-gray-400 hover:bg-gray-300">Close</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
