@@ -70,6 +70,13 @@
         .tree-item {
             @apply flex items-center gap-1.5 px-2 py-0.5 hover:bg-gray-200 cursor-pointer text-[13px] text-gray-700 font-sans;
         }
+        .context-menu {
+            @apply absolute bg-white border border-gray-300 shadow-lg rounded py-1 z-50 min-w-[150px];
+        }
+        .context-menu-item {
+            @apply px-4 py-1 text-[13px] hover:bg-blue-600 hover:text-white cursor-pointer block;
+        }
+
     </style>
 </head>
 
@@ -247,6 +254,13 @@
     </footer>
 
 
+    <div id="file-context-menu" class="context-menu hidden">
+        <div class="context-menu-item" id="ctx-new-file">New File</div>
+        <div class="context-menu-item" id="ctx-new-folder">New Folder</div>
+        <div class="border-b border-gray-200 my-1"></div>
+        <div class="context-menu-item" id="ctx-rename">Rename...</div>
+        <div class="context-menu-item" id="ctx-delete" style="color: #d32f2f;">Delete</div>
+    </div>
     <script src="renderer.js"></script>
 </body>
 
