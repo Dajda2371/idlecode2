@@ -1,0 +1,24 @@
+{
+  "name": "idlecode2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dajda2371/idlecode2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Dajda2371/idlecode2/issues"
+  },
+  "homepage": "https://github.com/Dajda2371/idlecode2#readme",
+  "devDependencies": {
+    "electron": "^40.2.1"
+  }
+}

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Python 3.8.1: tic_tac_toe_0.2.py</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-white;
+                font-family: 'Courier New', Courier, monospace;
+            }
+        }
+        :root {
+            --idle-bg: #ffffff;
+            --idle-menu-bg: #f0f0f0;
+            --idle-title-bg: #ffffff;
+            --sidebar-bg: #f3f3f3;
+            --sidebar-border: #e0e0e0;
+            --idle-keyword: #ff7b00;
+            --idle-builtin: #900090;
+            --idle-string: #00aa00;
+            --idle-comment: #dd0000;
+            --idle-text: #000000;
+            --explorer-bg: #f3f3f3;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .syntax-keyword { color: var(--idle-keyword); font-weight: bold; }
+        .syntax-builtin { color: var(--idle-builtin); }
+        .syntax-string { color: var(--idle-string); }
+        .syntax-comment { color: var(--idle-comment); }
+        .syntax-normal { color: var(--idle-text); }
+        .window-title-bar {
+            background: linear-gradient(90deg, #0054e3 0%, #27c4fb 100%);
+            color: white;
+            font-family: 'Tahoma', sans-serif;
+            font-size: 12px;
+            padding: 3px 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .window-controls {
+            display: flex;
+            gap: 2px;
+        }
+        .control-btn {
+            width: 16px;
+            height: 16px;
+            background: #ebebeb;
+            border: 1px solid #707070;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: black;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        .sidebar-header-btn {
+            @apply p-1 hover:bg-gray-200 rounded cursor-pointer flex items-center justify-center text-gray-600;
+        }
+        .tree-item {
+            @apply flex items-center gap-1.5 px-2 py-0.5 hover:bg-gray-200 cursor-pointer text-[13px] text-gray-700 font-sans;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+<div class="window-title-bar select-none">
+<div class="flex items-center gap-2">
+<img alt="IDLE Icon" class="w-4 h-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZuvFWVYuAOhHr0s9TPhAo-fpwjrCvSB8HZ4WsXLBVu7XkNXZAwpBd7atmXAR-dElOI9wNnE_sPUjjhjOYQAucnD2ln-JwwPk-enDFDVfAJ_jc2xidDw5vabPSbq0f4VKcVH_N9Q9eOnZh8fUwgRf4Hk7Os3RdSzvRTbM9sCW4OqZ-vNURIwBTDtLV5L6Rljkds9OpqiW4FYT7mmwL9w44BLzMrwh_Jbbc6w5G4vV3Dv_IbWGMFc94_SvwpqpXzLmxFEuOwA9aTS8"/>
+<span>tic_tac_toe_0.2.py - C:/Users/Kunal/Documents/#1 Code/#Projects/tic_tac_toe_0.2.py (3.8.1)</span>
+</div>
+<div class="window-controls">
+<div class="control-btn">_</div>
+<div class="control-btn">□</div>
+<div class="control-btn bg-[#e81123] text-white border-none">×</div>
+</div>
+</div>
+<nav class="bg-[#f0f0f0] border-b border-gray-300 px-1 py-0.5 flex gap-4 text-sm select-none">
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">File</div>
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Edit</div>
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Format</div>
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Run</div>
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Options</div>
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Window</div>
+<div class="px-2 hover:bg-blue-600 hover:text-white cursor-default">Help</div>
+</nav>
+<div class="flex-1 flex overflow-hidden">
+<aside class="w-[260px] bg-[var(--explorer-bg)] border-r border-[var(--sidebar-border)] flex flex-col font-sans select-none">
+<div class="px-3 py-2 flex items-center justify-between">
+<span class="text-[11px] font-bold text-gray-600 tracking-wider">EXPLORER</span>
+<span class="material-symbols-outlined text-gray-600 cursor-pointer">more_horiz</span>
+</div>
+<div class="overflow-y-auto">
+<div class="tree-item font-bold uppercase text-[11px] text-gray-600 bg-gray-200/50">
+<span class="material-symbols-outlined !text-[16px]">keyboard_arrow_down</span>
+                IDLECODE
+            </div>
+<div class="ml-2">
+<div class="tree-item">
+<span class="material-symbols-outlined !text-[16px]">keyboard_arrow_down</span>
+                    api
+                </div>
+<div class="ml-4">
+<div class="tree-item">
+<span class="material-symbols-outlined !text-[16px]">keyboard_arrow_down</span>
+                        get
+                    </div>
+<div class="ml-4">
+<div class="tree-item">
+<img alt="python" class="w-3.5 h-3.5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGsPM0pa6it1ik4ALfAseYsiUBtja_odQXYtSkBWckk_7seMGRxLVh19PyQnvSzqoSwjRb4doee1McFxJSSwtbjjiAwm-g3I-dfurW3cDOZLMOLrd8cJozhy1zC_2WWYJn91tjN_Ag74No_pmmqIK-OndotvzzYPESrPODIS6oPQ3KLccIIWDH7yT9YCmSVG9jt4YG5fqvUcqxZynsGt0wgO5U2cGdAKqfEKkcAXEIlV98_WvWEa6hCLzFH8h1dyU3bZ_sswlEu5A"/>
+                            helloworld.py
+                        </div>
+</div>
+</div>
+<div class="tree-item ml-2">
+<img alt="python" class="w-3.5 h-3.5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDi7slxKuR8BtfzyxZBoDjmHJA4caCs1a15Ig6XqKvRnJEuKqw-pr0A3akFByfij7G48lMSX7qP47ir9eLjgxBXyLIwOQzO-7-dcy4PqGbwvJRqhBhHmUOsw99d-A66xDyoOzOfG6mX2BUSBtiwcIMHKdqvAYJRUJLSaZK5kSYvzLVYWQF33m20saIU7bWB6COsWoZcnohD9Ht59-kU5s_ESUqNBdN3lCul3e6Gr8pzPTJqqqMXUcCUVu9903i0R9DsqmDlarTNqUU"/>
+                    __init__.py
+                </div>
+<div class="tree-item ml-2">
+<img alt="python" class="w-3.5 h-3.5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKCKLh4Z0QwLUZhM7L7h55IgwZo6qrd0cwF5NJZlm-YCPq-DLS3q7Ab8I_zTQp03UBUwAWaFg9tbuF2Lg2EkA97_5NUkGx4wlN4ZmBxwpQ3b4pigMD_N5BoTyd5V3OocXo6AXipHUQqdN5zuhTSLz4nsGgm8fbFzQph-MUj3lV9Z7eItRffwxlDpt1gWud7WksFj0km_d3bCyscTUtBKeJRXvVh2smsv_xcnv8u-7d8g6Tah49Lw2K_fYz_gVDuViNRFJi5XDdAtA"/>
+                    main.py
+                </div>
+<div class="tree-item ml-2">
+<img alt="python" class="w-3.5 h-3.5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJRXjAGU0ZlPTOpLjKpiVDsDiNccHEBq-0ZzlLnZ5EsRYedmtopTZ8VMOG7ZZxOV-AFM6Tky6t-D_lg4VMg_gpwNvb1TEca4x_XN5IG-lZLxzvJaKOVbwatHAHsv_5xJpBxykF_BWzsBCh_elRq_9o_WJiFRVUtHgbQBnYXwkw7drslKJhd8igB5Ggn0MqvdzvfvFJIaq0AXHSowbItYMi2RgHQ4lKpPxBvISMPtDYb1MZAng0SgsLO44Ij9qDLrVltjOYBZ9a3mY"/>
+                    webserver.py
+                </div>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex overflow-auto bg-white border-r border-gray-200">
+<div class="w-10 bg-white border-r border-gray-100 py-2 text-right pr-2 text-gray-400 select-none text-[13px]">
+<div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div><div>21</div><div>22</div><div>23</div><div>24</div><div>25</div>
+</div>
+<div class="flex-1 p-2 text-[14px] leading-tight whitespace-pre font-mono">
+<span class="syntax-keyword">import</span> <span class="syntax-builtin">random</span>
+<span class="syntax-keyword">class</span> <span class="syntax-normal">tictactoe:</span>
+    list_1=[[<span class="syntax-string">'D'</span>,<span class="syntax-string">'D'</span>,<span class="syntax-string">'D'</span>],[<span class="syntax-string">'D'</span>,<span class="syntax-string">'D'</span>,<span class="syntax-string">'D'</span>],[<span class="syntax-string">'D'</span>,<span class="syntax-string">'D'</span>,<span class="syntax-string">'D'</span>]]
+    uc_list=[0,1,2,3,4,5,6,7,8]
+    <span class="syntax-keyword">def</span> <span class="syntax-builtin">display</span>(self):
+        <span class="syntax-keyword">for</span> l <span class="syntax-keyword">in</span> list_1:
+            <span class="syntax-builtin">print</span>(l)
+        <span class="syntax-builtin">print</span>(<span class="syntax-string">"Printing uc list:"</span>)
+        <span class="syntax-builtin">print</span>(uc_list)
+    <span class="syntax-keyword">def</span> <span class="syntax-builtin">input</span>(self,loc):
+        <span class="syntax-keyword">if</span> loc <span class="syntax-keyword">in</span> uc_list:
+            <span class="syntax-builtin">print</span>(<span class="syntax-string">"Location is free:"</span>)
+            list_1[loc]=X
+            display()
+        <span class="syntax-keyword">else</span>:
+            <span class="syntax-builtin">print</span>(<span class="syntax-string">"Location occupied:"</span>)
+            display()
+    <span class="syntax-keyword">def</span> <span class="syntax-normal">comp(self):</span>
+<span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> uc_list:
+            ch=(<span class="syntax-builtin">random</span>.choice(uc_list))
+            list_1[ch]=0
+        <span class="syntax-keyword">else</span>:
+            <span class="syntax-builtin">print</span>(<span class="syntax-string">"Board is full!"</span>)
+<span class="syntax-comment"># Ln: 25 Col: 0</span><span class="inline-block w-[1px] h-[1.2em] bg-black animate-pulse align-middle ml-0.5"></span>
+</div>
+</main>
+<aside class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans">
+<div class="px-4 py-2 flex items-center justify-between border-b border-[var(--sidebar-border)]">
+<div class="flex items-center gap-4">
+<span class="text-[11px] font-bold tracking-wider text-black border-b-2 border-black pb-0.5">CHAT</span>
+<span class="material-symbols-outlined text-gray-400">more_horiz</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="sidebar-header-btn">
+<span class="material-symbols-outlined">add</span>
+<span class="material-symbols-outlined text-[10px]">keyboard_arrow_down</span>
+</div>
+<div class="sidebar-header-btn"><span class="material-symbols-outlined">settings</span></div>
+<div class="sidebar-header-btn"><span class="material-symbols-outlined">more_horiz</span></div>
+<div class="h-4 w-[1px] bg-gray-300 mx-1"></div>
+<div class="sidebar-header-btn"><span class="material-symbols-outlined">fullscreen</span></div>
+<div class="sidebar-header-btn"><span class="material-symbols-outlined">close</span></div>
+</div>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+<div class="mb-4">
+<span class="material-symbols-outlined text-gray-600 !text-6xl" style="font-variation-settings: 'FILL' 0, 'wght' 200;">forum</span>
+</div>
+<h2 class="text-3xl font-medium text-gray-800 mb-2">Build with Agent</h2>
+<p class="text-sm text-gray-500 mb-4 leading-relaxed">AI responses may be inaccurate.</p>
+<div class="flex flex-col items-center gap-1">
+<a class="text-[#0070f3] hover:underline text-sm font-medium" href="#">Generate Agent Instructions</a>
+<span class="text-sm text-gray-500">to onboard AI onto your codebase.</span>
+</div>
+</div>
+<div class="p-4">
+<div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+<button class="flex items-center gap-1.5 text-[12px] text-gray-600 border border-gray-200 rounded px-2 py-1 mb-2 hover:bg-gray-50">
+<span class="material-symbols-outlined !text-[14px]">attach_file</span>
+                    Add Context...
+                </button>
+<textarea class="w-full border-none focus:ring-0 p-0 text-sm placeholder-gray-400 resize-none h-12 mb-2" placeholder="Describe what to build next"></textarea>
+<div class="flex items-center justify-between border-t border-gray-50 pt-2">
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-1 text-[12px] text-gray-500 hover:text-black">
+                            Agent <span class="material-symbols-outlined !text-[14px]">keyboard_arrow_down</span>
+</button>
+<button class="flex items-center gap-1 text-[12px] text-gray-500 hover:text-black">
+                            Auto <span class="material-symbols-outlined !text-[14px]">keyboard_arrow_down</span>
+</button>
+<span class="material-symbols-outlined text-gray-400 !text-[18px] cursor-pointer hover:text-black">build</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-gray-400 !text-[18px] cursor-pointer hover:text-black">shortcut</span>
+<span class="material-symbols-outlined text-gray-300 !text-[20px]">send</span>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+<footer class="bg-[#f0f0f0] border-t border-gray-300 py-0.5 px-4 text-[11px] flex justify-end gap-10 select-none">
+<div>Ln: 25</div>
+<div>Col: 0</div>
+</footer>
+
+</body></html>
