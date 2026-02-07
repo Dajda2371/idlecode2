@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Turtle Demo</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            font-family: sans-serif;
+            background: #e0e0e0;
+        }
+
+        #sidebar {
+            width: 200px;
+            background: #f0f0f0;
+            border-right: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        #sidebar h3 {
+            margin-top: 0;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .example-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            background: white;
+            margin-bottom: 10px;
+        }
+
+        .example-item {
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .example-item:hover {
+            background: #e8e8e8;
+        }
+
+        .example-item.selected {
+            background: #cce8ff;
+        }
+
+        #canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        #canvas-container {
+            flex: 1;
+            background: white;
+            border: 1px solid #888;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            font-size: 13px;
+            padding: 4px 12px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="sidebar">
+        <h3>Examples</h3>
+        <div class="example-list" id="example-list">
+            <!-- Populated by JS -->
+        </div>
+        <button id="start-btn">Start</button>
+        <button id="stop-btn" style="margin-top:5px;">Stop</button>
+        <button id="clear-btn" style="margin-top:5px;">Clear</button>
+    </div>
+    <div id="canvas-area">
+        <div style="font-size:18px; font-weight:bold; color: #444;" id="demo-title">Select an example</div>
+        <div id="canvas-container">
+            <canvas id="turtle-canvas"></canvas>
+        </div>
+    </div>
+    <script src="turtle-demo.js"></script>
+</body>
+
+</html>
