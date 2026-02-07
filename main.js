@@ -416,6 +416,8 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
         commandHistory: [],
         inputDraft: '',
         stderrBuffer: '',
+        stdoutBuffer: '',
+        waitingForInput: false,
         listeners: new Set()
     };
 
@@ -424,9 +426,36 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     // Handle Output
     pyProcess.stdout.on('data', (data) => {
         const str = data.toString();
-        const entry = { type: 'stdout', text: str };
-        session.history.push(entry);
-        broadcastToSession(sessionId, 'session-output', entry);
+        session.stdoutBuffer += str;
+
+        // Check if this looks like an input prompt (no trailing newline)
+        // Python's input() writes the prompt to stdout without a newline
+        if (!str.endsWith('\n')) {
+            // This might be an input prompt - wait a bit to see if more data comes
+            setTimeout(() => {
+                // If buffer still doesn't end with newline, it's likely an input prompt
+                if (session.stdoutBuffer && !session.stdoutBuffer.endsWith('\n')) {
+                    const promptText = session.stdoutBuffer;
+                    session.waitingForInput = true;
+
+                    // Emit the prompt text as output first
+                    const entry = { type: 'stdout', text: promptText };
+                    session.history.push(entry);
+                    broadcastToSession(sessionId, 'session-output', entry);
+
+                    // Then signal that we're waiting for input
+                    broadcastToSession(sessionId, 'session-input-prompt', promptText);
+
+                    session.stdoutBuffer = '';
+                }
+            }, 50); // Small delay to catch any buffered data
+        } else {
+            // Normal output with newline
+            const entry = { type: 'stdout', text: session.stdoutBuffer };
+            session.history.push(entry);
+            broadcastToSession(sessionId, 'session-output', entry);
+            session.stdoutBuffer = '';
+        }
     });
 
     pyProcess.stderr.on('data', (data) => {
@@ -502,15 +531,24 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
 ipcMain.on('session-input', (event, sessionId, input) => {
     const session = sessions.get(sessionId);
     if (session) {
-        // Record Input
-        const entry = { type: 'input', text: input };
-        session.history.push(entry);
-        session.commandHistory.push(input);
+        // If we were waiting for input, don't echo as a command
+        if (session.waitingForInput) {
+            // Just send the input to Python, the renderer will handle echoing
+            session.waitingForInput = false;
+            if (session.process) {
+                session.process.stdin.write(input + '\n');
+            }
+        } else {
+            // Normal command - record and echo
+            const entry = { type: 'input', text: input };
+            session.history.push(entry);
+            session.commandHistory.push(input);
 
-        broadcastToSession(sessionId, 'session-output', entry); // Echo to all views
+            broadcastToSession(sessionId, 'session-output', entry); // Echo to all views
 
-        if (session.process) {
-            session.process.stdin.write(input + '\n');
+            if (session.process) {
+                session.process.stdin.write(input + '\n');
+            }
         }
     }
 });

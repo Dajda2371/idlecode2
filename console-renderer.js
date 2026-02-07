@@ -115,17 +115,49 @@ function escapeHtml(text) {
 }
 
 // Input Handling
+let waitingForInput = false;
+let inputPromptText = '';
+
 consoleInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         if (!currentSessionId) return;
         const command = consoleInput.value;
 
-        // Send to Main (it will echo back as 'input' type)
-        ipcRenderer.send('session-input', currentSessionId, command);
+        // Check if we're waiting for input() response
+        if (waitingForInput) {
+            // Echo the full line (prompt + input) to the output
+            const fullLine = inputPromptText + command;
+            const div = document.createElement('div');
+            div.className = "mt-1";
+            div.innerHTML = `<span>${escapeHtml(fullLine)}</span>`;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
 
-        // Clear input
-        consoleInput.value = '';
-        ipcRenderer.send('session-input-draft', currentSessionId, ''); // Clear draft
+            // Send just the user's input to Python
+            ipcRenderer.send('session-input', currentSessionId, command);
+
+            // Clear the waiting state
+            waitingForInput = false;
+            inputPromptText = '';
+
+            // Restore the normal prompt
+            const promptSpan = document.getElementById('console-prompt');
+            if (promptSpan) {
+                promptSpan.innerText = currentPromptText || '>>>';
+            }
+
+            // Clear input
+            consoleInput.value = '';
+            ipcRenderer.send('session-input-draft', currentSessionId, '');
+        } else {
+            // Normal command handling
+            // Send to Main (it will echo back as 'input' type)
+            ipcRenderer.send('session-input', currentSessionId, command);
+
+            // Clear input
+            consoleInput.value = '';
+            ipcRenderer.send('session-input-draft', currentSessionId, ''); // Clear draft
+        }
 
     } else if (e.key === 'ArrowUp') {
         if (historyIndex > 0) {
@@ -205,6 +237,25 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
         }
     }
 });
+
+// Input Prompt Handling (for Python's input() function)
+ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
+    if (sessionId !== currentSessionId) return;
+
+    // Store that we're waiting for input
+    waitingForInput = true;
+    inputPromptText = promptText;
+
+    // Update the prompt
+    const promptSpan = document.getElementById('console-prompt');
+    if (promptSpan) {
+        promptSpan.innerText = promptText;
+    }
+
+    // Clear the input field
+    consoleInput.value = '';
+});
+
 
 // Tab and Smart Backspace
 consoleInput.addEventListener('keydown', (e) => {

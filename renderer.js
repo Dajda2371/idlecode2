@@ -990,18 +990,50 @@ consoleInput.addEventListener('keydown', (e) => {
 
         const command = consoleInput.value;
 
-        // Send to Main (it will echo back as 'input' type which we render)
-        ipcRenderer.send('session-input', currentConsole.id, command);
+        // Check if we're waiting for input() response
+        if (currentConsole.waitingForInput) {
+            // Echo the full line (prompt + input) to the output
+            const fullLine = currentConsole.inputPromptText + command;
+            const div = document.createElement('div');
+            div.className = "mt-1";
+            div.innerHTML = `<span>${escapeHtml(fullLine)}</span>`;
+            const outputContainer = document.querySelector(`#console-output`);
+            if (outputContainer) {
+                outputContainer.appendChild(div);
+                outputContainer.scrollTop = outputContainer.scrollHeight;
+            }
 
-        // Clear input and draft
-        consoleInput.value = '';
-        currentConsole.inputDraft = '';
-        ipcRenderer.send('session-input-draft', currentConsole.id, '');
+            // Send just the user's input to Python
+            ipcRenderer.send('session-input', currentConsole.id, command);
 
-        // Command history is updated when we receive the echo back in session-output
+            // Clear the waiting state
+            currentConsole.waitingForInput = false;
+            currentConsole.inputPromptText = '';
 
-        // Reset scroll?
-        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            // Restore the normal prompt
+            if (consolePrompt) {
+                consolePrompt.innerText = currentConsole.promptText || '>>>';
+            }
+
+            // Clear input
+            consoleInput.value = '';
+            currentConsole.inputDraft = '';
+            ipcRenderer.send('session-input-draft', currentConsole.id, '');
+        } else {
+            // Normal command handling
+            // Send to Main (it will echo back as 'input' type which we render)
+            ipcRenderer.send('session-input', currentConsole.id, command);
+
+            // Clear input and draft
+            consoleInput.value = '';
+            currentConsole.inputDraft = '';
+            ipcRenderer.send('session-input-draft', currentConsole.id, '');
+
+            // Command history is updated when we receive the echo back in session-output
+
+            // Reset scroll?
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
     } else if (e.key === 'ArrowUp') {
         const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole && currentConsole.historyIndex > 0) {
@@ -1101,6 +1133,31 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
         }
     } else {
         console.log('[RENDERER] Session is not active, skipping UI update');
+    }
+});
+
+// Input Prompt Handling (for Python's input() function)
+ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
+    console.log(`[RENDERER] session-input-prompt received: sessionId=${sessionId}, promptText=${promptText}`);
+
+    const consoleData = consoles.find(c => c.id === sessionId);
+    if (!consoleData) {
+        console.log('[RENDERER] No consoleData found for session:', sessionId);
+        return;
+    }
+
+    // Store that we're waiting for input and the prompt text
+    consoleData.waitingForInput = true;
+    consoleData.inputPromptText = promptText;
+
+    // Update UI if active
+    if (activeConsoleId === sessionId) {
+        console.log('[RENDERER] Updating prompt for input:', promptText);
+        if (consolePrompt) {
+            consolePrompt.innerText = promptText;
+        }
+        // Clear the input field
+        consoleInput.value = '';
     }
 });
 
