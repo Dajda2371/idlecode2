@@ -367,36 +367,71 @@ function renderCode(content) {
 
     // We use innerHTML to support syntax highlighting.
 
+
     // Use highlight.js
     const highlightedCode = hljs.highlight(content, { language: 'python' }).value;
 
-    // Split back into lines to preserve our line-based div structure
-    // This can be tricky if hljs spans cross newlines. 
-    // Usually hljs returns a big HTML string.
-    // If we want to line numbers to align, we should probably render the whole thing 
-    // but we need to ensure separate lines for our loop.
-    // Simpler approach: Just put the whole highlighted HTML in, and count lines for line numbers.
-    // BUT we want to keep the "div per line" structure if possible for "Go to Line" and structure.
-    // However, hljs might open a span on line 1 and close it on line 3 (multi-line string).
-    // Breaking that into divs is hard.
+    // Split highlighted code into lines. 
+    // HLJS might produce HTML that spans lines. This is the tricky part.
+    // If we use separate containers for line numbers, alignment fails as seen.
+    // So we MUST use a row-based layout: <div class="line"><div class="num">1</div><div class="code">...</div></div>
+    // BUT HLJS output is a single HTML block.
+    // To solve this robustly without a complex parser:
+    // 1. We keep the separate containers but force them to be single lines with NO WRAPPING.
+    // 2. We set explicit height in pixels for every line.
 
-    // Alternative: Just set innerHTML with the blob, and ensure line-height matches line-numbers.
-    // We already use a monospaced font so height should match if we handle newlines right.
-    // Let's wrapping it in a pre or just use simple newlines?
-    // Our existing CSS uses `whitespace-pre`.
+    // Let's try explicit line styling first. 
+    // The previous attempt failed because contenteditable puts text in text nodes or divs, and highlight.js puts spans. 
+    // Spans can affect line height if font-size fallback happens or if there are inline-blocks.
 
-    codeContent.innerHTML = highlightedCode;
+    codeContent.innerHTML = '';
 
-    // Add line numbers based on newlines
-    const lineCount = content.split('\n').length;
-    updateLineNumbers(lineCount);
+    // Use highlight.js
+    // We will highlight line-by-line to ensure perfect alignment with line numbers.
+    let html = '';
+
+    lineNumbers.innerHTML = ''; // Clear existing line numbers
+
+    lines.forEach((line, index) => {
+        // Highlight each line individually.
+        const highlightedLine = hljs.highlight(line, { language: 'python' }).value;
+        const lineNum = index + 1;
+
+        // Enforce fixed height row
+        // We use explicit styles to override any CSS cascading issues
+        html += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
+
+        const numDiv = document.createElement('div');
+        numDiv.textContent = lineNum;
+        numDiv.className = 'h-[20px] leading-[20px]';
+        numDiv.style.height = '20px';
+        numDiv.style.lineHeight = '20px';
+        lineNumbers.appendChild(numDiv);
+    });
+
+    codeContent.innerHTML = html;
+
+    // Scroll Sync
+    codeContent.onscroll = () => {
+        lineNumbers.scrollTop = codeContent.scrollTop;
+    };
 
     // Simple line number sync (Optimized)
     codeContent.oninput = () => {
         const text = codeContent.innerText;
         const currentCheck = text.split('\n').length;
-        if (currentCheck !== lineCount) {
-            updateLineNumbers(currentCheck);
+        if (currentCheck !== lines.length) {
+            // We can't easily update line numbers one by one without re-rendering?
+            // For now, let's just update the count.
+            lineNumbers.innerHTML = '';
+            for (let i = 1; i <= currentCheck; i++) {
+                const numDiv = document.createElement('div');
+                numDiv.textContent = i;
+                numDiv.style.height = '20px';
+                numDiv.style.lineHeight = '20px';
+                numDiv.className = 'h-[20px] leading-[20px]';
+                lineNumbers.appendChild(numDiv);
+            }
         }
     };
 
@@ -408,16 +443,6 @@ function renderCode(content) {
     };
 }
 
-function updateLineNumbers(count) {
-    const lineNumbers = document.getElementById('line-numbers');
-    lineNumbers.innerHTML = '';
-    for (let i = 1; i <= count; i++) {
-        const numDiv = document.createElement('div');
-        numDiv.textContent = i;
-        numDiv.className = 'h-[20px] leading-[20px]'; // Match CSS line-height exactly
-        lineNumbers.appendChild(numDiv);
-    }
-}
 
 function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
