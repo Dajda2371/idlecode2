@@ -509,6 +509,22 @@ ipcMain.on('session-detach', (event, sessionId) => {
     }
 });
 
+// Explicit session close (removes from UI)
+ipcMain.on('session-close', (event, sessionId) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+        // Notify listeners to remove UI
+        session.listeners.forEach(wc => {
+            if (!wc.isDestroyed()) wc.send('session-closed', sessionId);
+        });
+
+        if (session.process) {
+            session.process.kill();
+        }
+        sessions.delete(sessionId);
+    }
+});
+
 // Updated Pop-out Logic: Open window for EXISTING session
 ipcMain.on('pop-out-session', (event, sessionId, title) => {
     const subWin = new BrowserWindow({

@@ -143,7 +143,8 @@ consoleInput.addEventListener('input', () => {
 // Kill session on window close
 window.addEventListener('beforeunload', () => {
     if (currentSessionId) {
-        ipcRenderer.send('session-kill', currentSessionId);
+        // Send request to remove session entirely
+        ipcRenderer.send('session-close', currentSessionId);
     }
 });
 

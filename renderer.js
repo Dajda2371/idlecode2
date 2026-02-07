@@ -838,10 +838,9 @@ function createConsole(name = null, filePath = null) {
 function spawnConsoleProcess(consoleData, filePath = null) {
     // If resetting existing console
     if (filePath) {
-        // Kill existing session in Main?
-        // Or just detatch and create new one with same ID?
-        // Reuse ID.
+        // Just kill process to restart, don't remove session from UI
         ipcRenderer.send('session-kill', consoleData.id);
+
         consoleData.name = `Run: ${path.basename(filePath)}`;
         consoleData.filePath = filePath;
         consoleData.history += `<div class="text-gray-500 mb-1 mt-2">=== RESTART: ${filePath} ===</div>`;
@@ -874,15 +873,18 @@ function switchConsole(id) {
     consoleInput.focus();
 }
 
-function closeConsole(id) {
+ipcRenderer.on('session-closed', (event, sessionId) => {
+    closeConsole(sessionId, false); // False means don't send IPC again, just clear UI
+});
+
+function closeConsole(id, sendIPC = true) {
     const idx = consoles.findIndex(c => c.id === id);
     if (idx === -1) return;
 
     const target = consoles[idx];
-    // ipcRenderer.send('session-kill', id); // Logic: closing tab kills session?
-    // User requested "hidden console pops out".
-    // But this is "close console" (delete). Yes, delete should kill.
-    ipcRenderer.send('session-kill', id);
+    if (sendIPC) {
+        ipcRenderer.send('session-close', id);
+    }
 
     consoles.splice(idx, 1);
 
