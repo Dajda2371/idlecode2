@@ -992,11 +992,13 @@ consoleInput.addEventListener('keydown', (e) => {
 
         // Check if we're waiting for input() response
         if (currentConsole.waitingForInput) {
-            // Echo the full line (prompt + input) to the output
-            const fullLine = currentConsole.inputPromptText + command;
+            // Create a line with the prompt in blue (stdout color) and input in black
             const div = document.createElement('div');
             div.className = "mt-1";
-            div.innerHTML = `<span>${escapeHtml(fullLine)}</span>`;
+            const promptSpan = `<span class="text-blue-600">${escapeHtml(currentConsole.inputPromptText)}</span>`;
+            const inputSpan = `<span>${escapeHtml(command)}</span>`;
+            div.innerHTML = promptSpan + inputSpan;
+
             const outputContainer = document.querySelector(`#console-output`);
             if (outputContainer) {
                 outputContainer.appendChild(div);

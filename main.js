@@ -438,12 +438,7 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
                     const promptText = session.stdoutBuffer;
                     session.waitingForInput = true;
 
-                    // Emit the prompt text as output first
-                    const entry = { type: 'stdout', text: promptText };
-                    session.history.push(entry);
-                    broadcastToSession(sessionId, 'session-output', entry);
-
-                    // Then signal that we're waiting for input
+                    // Signal that we're waiting for input (don't emit as output yet)
                     broadcastToSession(sessionId, 'session-input-prompt', promptText);
 
                     session.stdoutBuffer = '';
