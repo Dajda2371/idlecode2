@@ -413,6 +413,7 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
         history: [],
         commandHistory: [],
         inputDraft: '',
+        stderrBuffer: '',
         listeners: new Set()
     };
 
@@ -427,28 +428,52 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     });
 
     pyProcess.stderr.on('data', (data) => {
-        let str = data.toString();
+        session.stderrBuffer += data.toString();
 
-        // Check for prompts at the END of the string
-        let promptType = null;
-        if (str.endsWith('>>> ') || str.endsWith('>>>')) {
-            promptType = 'standard';
-            str = str.replace(/>>> ?$/, ''); // Strip it
-        } else if (str.endsWith('... ') || str.endsWith('...')) {
-            promptType = 'continuation';
-            str = str.replace(/\.\.\. ?$/, ''); // Strip it
+        let promptFound = null;
+        let promptLen = 0;
+
+        // Check for recognized prompts at the end of the buffer
+        if (session.stderrBuffer.endsWith('>>> ')) {
+            promptFound = 'standard';
+            promptLen = 4;
+        } else if (session.stderrBuffer.endsWith('>>>')) {
+            promptFound = 'standard';
+            promptLen = 3;
+        } else if (session.stderrBuffer.endsWith('... ')) {
+            promptFound = 'continuation';
+            promptLen = 4;
+        } else if (session.stderrBuffer.endsWith('...')) {
+            promptFound = 'continuation';
+            promptLen = 3;
         }
 
-        // If there was content before the prompt (or if it was just content)
-        if (str.length > 0) {
-            const entry = { type: 'stderr', text: str };
-            session.history.push(entry);
-            broadcastToSession(sessionId, 'session-output', entry);
-        }
+        if (promptFound) {
+            // Emit everything before the prompt as actual stderr
+            const text = session.stderrBuffer.slice(0, -promptLen);
+            if (text) {
+                const entry = { type: 'stderr', text: text };
+                session.history.push(entry);
+                broadcastToSession(sessionId, 'session-output', entry);
+            }
 
-        // Broadcast prompt change if detected
-        if (promptType) {
-            broadcastToSession(sessionId, 'session-prompt', promptType);
+            // Emit prompt event
+            broadcastToSession(sessionId, 'session-prompt', promptFound);
+
+            // Clear buffer
+            session.stderrBuffer = '';
+        } else {
+            // No prompt found (yet). 
+            // Flush complete lines to avoid lag, but keep the tail which might be a partial prompt.
+            const idx = session.stderrBuffer.lastIndexOf('\n');
+            if (idx !== -1) {
+                const text = session.stderrBuffer.slice(0, idx + 1);
+                const entry = { type: 'stderr', text: text };
+                session.history.push(entry);
+                broadcastToSession(sessionId, 'session-output', entry);
+
+                session.stderrBuffer = session.stderrBuffer.slice(idx + 1);
+            }
         }
     });
 

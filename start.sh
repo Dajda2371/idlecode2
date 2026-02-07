@@ -1,1 +1,3 @@
+export PYTHONUNBUFFERED=1
+export PYTHONIOENCODING=utf-8
 npm start
