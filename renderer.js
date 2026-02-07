@@ -1125,6 +1125,23 @@ consoleInput.addEventListener('keydown', (e) => {
                 consoleInput.selectionStart = consoleInput.selectionEnd = start - 4;
             }
         }
+    } else if (e.key === 'ArrowLeft') {
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        // Only move by 4 if no selection and we can move back 4 spaces
+        if (start === end && start >= 4) {
+            e.preventDefault();
+            consoleInput.selectionStart = consoleInput.selectionEnd = start - 4;
+        }
+    } else if (e.key === 'ArrowRight') {
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        const val = consoleInput.value;
+        // Only move by 4 if no selection and we can move forward 4 spaces
+        if (start === end && start + 4 <= val.length) {
+            e.preventDefault();
+            consoleInput.selectionStart = consoleInput.selectionEnd = start + 4;
+        }
     }
 });
 
