@@ -995,9 +995,16 @@ consoleInput.addEventListener('keydown', (e) => {
             // Create a line with the prompt in blue (stdout color) and input in black
             const div = document.createElement('div');
             div.className = "mt-1";
-            const promptSpan = `<span class="text-blue-600">${escapeHtml(currentConsole.inputPromptText)}</span>`;
-            const inputSpan = `<span>${escapeHtml(command)}</span>`;
-            div.innerHTML = promptSpan + inputSpan;
+
+            // Only show prompt if it's not empty
+            if (currentConsole.inputPromptText !== '') {
+                const promptSpan = `<span class="text-blue-600">${escapeHtml(currentConsole.inputPromptText)}</span>`;
+                const inputSpan = `<span>${escapeHtml(command)}</span>`;
+                div.innerHTML = promptSpan + inputSpan;
+            } else {
+                // Empty prompt - just show the input
+                div.innerHTML = `<span>${escapeHtml(command)}</span>`;
+            }
 
             const outputContainer = document.querySelector(`#console-output`);
             if (outputContainer) {
@@ -1012,8 +1019,9 @@ consoleInput.addEventListener('keydown', (e) => {
             currentConsole.waitingForInput = false;
             currentConsole.inputPromptText = '';
 
-            // Restore the normal prompt
+            // Restore the normal prompt (and make it visible again)
             if (consolePrompt) {
+                consolePrompt.style.display = '';
                 consolePrompt.innerText = currentConsole.promptText || '>>>';
             }
 
@@ -1156,7 +1164,14 @@ ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
     if (activeConsoleId === sessionId) {
         console.log('[RENDERER] Updating prompt for input:', promptText);
         if (consolePrompt) {
-            consolePrompt.innerText = promptText;
+            if (promptText === '') {
+                // Empty prompt - hide the prompt element to stretch the input
+                consolePrompt.style.display = 'none';
+            } else {
+                // Show prompt with the text
+                consolePrompt.style.display = '';
+                consolePrompt.innerText = promptText;
+            }
         }
         // Clear the input field
         consoleInput.value = '';

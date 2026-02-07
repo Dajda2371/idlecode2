@@ -128,9 +128,16 @@ consoleInput.addEventListener('keydown', (e) => {
             // Create a line with the prompt in blue (stdout color) and input in black
             const div = document.createElement('div');
             div.className = "mt-1";
-            const inputPromptSpan = `<span class="text-blue-600">${escapeHtml(inputPromptText)}</span>`;
-            const inputSpan = `<span>${escapeHtml(command)}</span>`;
-            div.innerHTML = inputPromptSpan + inputSpan;
+
+            // Only show prompt if it's not empty
+            if (inputPromptText !== '') {
+                const inputPromptSpan = `<span class="text-blue-600">${escapeHtml(inputPromptText)}</span>`;
+                const inputSpan = `<span>${escapeHtml(command)}</span>`;
+                div.innerHTML = inputPromptSpan + inputSpan;
+            } else {
+                // Empty prompt - just show the input
+                div.innerHTML = `<span>${escapeHtml(command)}</span>`;
+            }
             consoleOutput.appendChild(div);
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
 
@@ -141,9 +148,10 @@ consoleInput.addEventListener('keydown', (e) => {
             waitingForInput = false;
             inputPromptText = '';
 
-            // Restore the normal prompt
+            // Restore the normal prompt (and make it visible again)
             const promptSpan = document.getElementById('console-prompt');
             if (promptSpan) {
+                promptSpan.style.display = '';
                 promptSpan.innerText = currentPromptText || '>>>';
             }
 
@@ -250,7 +258,14 @@ ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
     // Update the prompt
     const promptSpan = document.getElementById('console-prompt');
     if (promptSpan) {
-        promptSpan.innerText = promptText;
+        if (promptText === '') {
+            // Empty prompt - hide to stretch the input
+            promptSpan.style.display = 'none';
+        } else {
+            // Show prompt with text
+            promptSpan.style.display = '';
+            promptSpan.innerText = promptText;
+        }
     }
 
     // Clear the input field
