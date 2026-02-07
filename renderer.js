@@ -655,7 +655,6 @@ function runPythonMetadata(path) {
 // Console State
 let consoles = [];
 let activeConsoleId = null;
-let nextConsoleId = 1;
 
 // Elements
 const consoleOutput = document.getElementById('console-output');
@@ -665,8 +664,22 @@ const consoleList = document.getElementById('console-list');
 const addConsoleBtn = document.getElementById('add-console-btn');
 const activeConsoleTitle = document.getElementById('active-console-title');
 
-function createConsole(name = `Shell ${nextConsoleId}`, filePath = null) {
-    const id = nextConsoleId++;
+function createConsole(name = null, filePath = null) {
+    // Calculate next ID by finding the first gap
+    let newId = 1;
+    const existingIds = consoles.map(c => c.id).sort((a, b) => a - b);
+    for (const existingId of existingIds) {
+        if (existingId === newId) {
+            newId++;
+        } else {
+            break;
+        }
+    }
+
+    // Default name
+    if (!name) name = `Shell ${newId}`;
+
+    const id = newId;
     const consoleData = {
         id,
         name,
@@ -752,7 +765,6 @@ function closeConsole(id) {
     if (consoles.length === 0) {
         // Reset ID
         activeConsoleId = null;
-        nextConsoleId = 1;
 
         // Clear UI
         consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
