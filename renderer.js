@@ -20,6 +20,11 @@ let ctxTarget = null;
 let ctxPath = null;
 let ctxIsDir = false;
 
+// UI Elements for Menu
+const ctxRename = document.getElementById('ctx-rename');
+const ctxDelete = document.getElementById('ctx-delete');
+const ctxSeparator = contextMenu.querySelector('.border-b');
+
 // Initial Load
 loadDirectory(PROJECT_ROOT, treeContainer);
 
@@ -30,8 +35,32 @@ document.addEventListener('click', () => {
     }
 });
 
+// Empty Space Context Menu (Root Level)
+treeContainer.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    // If propagation was stopped by an item, this won't run.
+    console.log('Root context menu triggered');
+
+    // Clear selection when clicking empty space
+    document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('bg-blue-100', 'text-blue-600'));
+
+    ctxTarget = { row: null, parent: treeContainer, childrenContainer: null, fullPath: PROJECT_ROOT };
+    ctxPath = PROJECT_ROOT;
+    ctxIsDir = true;
+
+    // Show only New File/Folder
+    ctxRename.style.display = 'none';
+    ctxDelete.style.display = 'none';
+    if (ctxSeparator) ctxSeparator.style.display = 'none';
+
+    // Position Menu
+    contextMenu.style.left = `${e.pageX}px`;
+    contextMenu.style.top = `${e.pageY}px`;
+    contextMenu.classList.remove('hidden');
+});
+
 function loadDirectory(dirPath, container) {
-    container.innerHTML = ''; // Clear to reload
+    container.innerHTML = '';
     fs.readdir(dirPath, { withFileTypes: true }, (err, dirents) => {
         if (err) return console.error(err);
 
@@ -123,9 +152,18 @@ function createTreeItem(dirent, fullPath, parentContainer) {
         e.preventDefault();
         e.stopPropagation();
 
+        // Highlight logic
+        document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('bg-blue-100', 'text-blue-600'));
+        itemRow.classList.add('bg-blue-100', 'text-blue-600');
+
         ctxTarget = { row: itemRow, parent: parentContainer, childrenContainer: childrenContainer, fullPath: fullPath };
         ctxPath = fullPath;
         ctxIsDir = isDir;
+
+        // Ensure full menu is shown
+        ctxRename.style.display = 'block';
+        ctxDelete.style.display = 'block';
+        if (ctxSeparator) ctxSeparator.style.display = 'block';
 
         // Position Menu
         contextMenu.style.left = `${e.pageX}px`;
@@ -145,13 +183,24 @@ document.getElementById('ctx-delete').addEventListener('click', () => deleteItem
 function createItemUI(isFolder) {
     if (!ctxTarget) return;
 
-    // Determine where to add: if target is open folder, add inside. else add to parent.
-    let containerToAdd = ctxTarget.parent;
-    let basePath = path.dirname(ctxPath);
+    // Determine target container
+    let containerToAdd;
+    let basePath;
 
-    if (ctxIsDir && !ctxTarget.childrenContainer.classList.contains('hidden')) {
-        containerToAdd = ctxTarget.childrenContainer;
-        basePath = ctxPath;
+    // If clicking root (empty space)
+    if (ctxTarget.parent === treeContainer && !ctxTarget.row) {
+        containerToAdd = treeContainer;
+        basePath = PROJECT_ROOT;
+    } else {
+        // Normal item click
+        containerToAdd = ctxTarget.parent;
+        basePath = path.dirname(ctxPath);
+
+        // If clicking a folder that is expanded, add inside
+        if (ctxIsDir && ctxTarget.childrenContainer && !ctxTarget.childrenContainer.classList.contains('hidden')) {
+            containerToAdd = ctxTarget.childrenContainer;
+            basePath = ctxPath;
+        }
     }
 
     const inputContainer = document.createElement('div');
@@ -169,7 +218,8 @@ function createItemUI(isFolder) {
     inputContainer.appendChild(icon);
     inputContainer.appendChild(input);
 
-    // Insert at top of container
+    // Insert Logic: 
+    // If root/empty space click, just append or prepend? Prepend looks better.
     if (containerToAdd.firstChild) {
         containerToAdd.insertBefore(inputContainer, containerToAdd.firstChild);
     } else {
@@ -194,7 +244,6 @@ function createItemUI(isFolder) {
             } else {
                 fs.writeFileSync(newPath, '');
             }
-            // Reload the container
             loadDirectory(basePath, containerToAdd);
         } catch (err) {
             console.error(err);
@@ -209,17 +258,15 @@ function createItemUI(isFolder) {
     });
 
     input.addEventListener('blur', () => {
-        // Optional: Commit on blur? VS Code does commit on blur usually, but easy to trigger accidentally.
-        // Let's remove on blur if empty, or try commit.
         if (document.activeElement !== input) commitCreation();
     });
 }
 
 function renameItemUI() {
-    if (!ctxTarget) return;
+    if (!ctxTarget || !ctxTarget.row) return; // Cannot rename root
 
     const row = ctxTarget.row;
-    const labelSpan = row.querySelector('span:last-child'); // The text label
+    const labelSpan = row.querySelector('span:last-child');
     const oldName = labelSpan.textContent;
 
     const input = document.createElement('input');
@@ -229,9 +276,8 @@ function renameItemUI() {
 
     labelSpan.replaceWith(input);
     input.focus();
-    input.select(); // Select filename excluding extension logic could be nice, but simple select all for now
+    input.select();
 
-    // Prevent row click while editing
     input.addEventListener('click', e => e.stopPropagation());
 
     const commitRename = () => {
@@ -245,10 +291,6 @@ function renameItemUI() {
 
         try {
             fs.renameSync(ctxPath, newPath);
-            // Reload parent container to refresh tree
-            // Since we don't track parent container easily for root items without passed context in loadDirectory,
-            // we rely on the closure 'ctxTarget.parent' if we passed it.
-            // Wait, we need to pass parentContainer to createTreeItem.
             loadDirectory(path.dirname(ctxPath), ctxTarget.parent);
         } catch (err) {
             console.error(err);
@@ -266,16 +308,12 @@ function renameItemUI() {
 }
 
 function deleteItem() {
-    if (!ctxTarget) return;
+    if (!ctxTarget || !ctxTarget.row) return;
     if (!confirm(`Are you sure you want to delete '${path.basename(ctxPath)}'?`)) return;
 
     try {
         fs.rmSync(ctxPath, { recursive: true, force: true });
-        // ctxTarget.row.parentElement.remove(); // Removes the itemContainer
-        // Better to reload parent to ensure state consistency
         loadDirectory(path.dirname(ctxPath), ctxTarget.parent);
-
-        // If deleted file was open, we should probably clear editor, but that's extra polish.
     } catch (err) {
         console.error(err);
         alert(`Error deleting: ${err.message}`);
@@ -293,6 +331,11 @@ function openFile(filePath) {
 
 function renderCode(content) {
     const lines = content.split('\n');
+    const lineNumbers = document.getElementById('line-numbers');
+    const codeContent = document.getElementById('code-content');
+
+    if (!lineNumbers || !codeContent) return;
+
     lineNumbers.innerHTML = '';
     codeContent.innerHTML = '';
 
@@ -322,5 +365,4 @@ function escapeHtml(text) {
 }
 
 window.toggleMenu = (menuId) => {
-    // Keep placeholder for consistency
 };
