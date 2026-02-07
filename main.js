@@ -428,24 +428,32 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     });
 
     pyProcess.stderr.on('data', (data) => {
-        session.stderrBuffer += data.toString();
+        let str = data.toString();
+        // Console logging for debugging (will show in terminal)
+        console.log(`STDERR DATA: ${JSON.stringify(str)}`);
+
+        // Strip ANSI codes (simple regex)
+        // eslint-disable-next-line no-control-regex
+        str = str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+
+        session.stderrBuffer += str;
 
         let promptFound = null;
         let promptLen = 0;
 
-        // Check for recognized prompts at the end of the buffer
-        if (session.stderrBuffer.endsWith('>>> ')) {
+        // Check for recognized prompts at the end of the buffer using Regex
+        // We look for >>> optionally followed by space, or ... optionally followed by space
+        // at the very end of the buffer.
+
+        const standardMatch = session.stderrBuffer.match(/>>> ?$/);
+        const continuationMatch = session.stderrBuffer.match(/\.\.\. ?$/);
+
+        if (standardMatch) {
             promptFound = 'standard';
-            promptLen = 4;
-        } else if (session.stderrBuffer.endsWith('>>>')) {
-            promptFound = 'standard';
-            promptLen = 3;
-        } else if (session.stderrBuffer.endsWith('... ')) {
+            promptLen = standardMatch[0].length;
+        } else if (continuationMatch) {
             promptFound = 'continuation';
-            promptLen = 4;
-        } else if (session.stderrBuffer.endsWith('...')) {
-            promptFound = 'continuation';
-            promptLen = 3;
+            promptLen = continuationMatch[0].length;
         }
 
         if (promptFound) {
@@ -462,6 +470,9 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
 
             // Clear buffer
             session.stderrBuffer = '';
+
+            // Debug log
+            console.log(`Detected prompt: ${promptFound}`);
         } else {
             // No prompt found (yet). 
             // Flush complete lines to avoid lag, but keep the tail which might be a partial prompt.
