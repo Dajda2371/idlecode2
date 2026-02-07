@@ -20,5 +20,8 @@
   "homepage": "https://github.com/Dajda2371/idlecode2#readme",
   "devDependencies": {
     "electron": "^40.2.1"
+  },
+  "dependencies": {
+    "highlight.js": "^11.11.1"
   }
 }

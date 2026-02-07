@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { ipcRenderer } = require('electron');
+const hljs = require('highlight.js/lib/core');
+hljs.registerLanguage('python', require('highlight.js/lib/languages/python'));
 
 // IPC Listeners
 ipcRenderer.on('open-file', (event, filePath) => {
@@ -365,70 +367,37 @@ function renderCode(content) {
 
     // We use innerHTML to support syntax highlighting.
 
-    let htmlContent = '';
+    // Use highlight.js
+    const highlightedCode = hljs.highlight(content, { language: 'python' }).value;
 
-    lines.forEach((line) => {
-        // 1. Escape HTML first to prevent XSS and standardize processing
-        let processedLine = escapeHtml(line);
+    // Split back into lines to preserve our line-based div structure
+    // This can be tricky if hljs spans cross newlines. 
+    // Usually hljs returns a big HTML string.
+    // If we want to line numbers to align, we should probably render the whole thing 
+    // but we need to ensure separate lines for our loop.
+    // Simpler approach: Just put the whole highlighted HTML in, and count lines for line numbers.
+    // BUT we want to keep the "div per line" structure if possible for "Go to Line" and structure.
+    // However, hljs might open a span on line 1 and close it on line 3 (multi-line string).
+    // Breaking that into divs is hard.
 
-        // 2. Extract Strings and Comments to prevent keyword matching inside them or inside HTML tags
-        // We replace them with placeholders like VS_MARKER_0, VS_MARKER_1
-        const markers = [];
-        const addMarker = (content, type) => {
-            const id = `__VS_MARKER_${markers.length}__`;
-            markers.push({ id, content, type });
-            return id;
-        };
+    // Alternative: Just set innerHTML with the blob, and ensure line-height matches line-numbers.
+    // We already use a monospaced font so height should match if we handle newlines right.
+    // Let's wrapping it in a pre or just use simple newlines?
+    // Our existing CSS uses `whitespace-pre`.
 
-        // Match strings (escaped quotes) and comments
-        // Note: Check for comments first? No, strings can contain #. Strings first.
-        // We need to match greedy but handled correctly.
-        // Ideally we iterate. But regex replace with callback is easier.
-        // We must handle mixed types. 
-        // A simple combined regex:
-        // /(&quot;.*?&quot;|&#039;.*?&#039;|#.*$)/g
+    codeContent.innerHTML = highlightedCode;
 
-        processedLine = processedLine.replace(/(&quot;.*?&quot;|&#039;.*?&#039;|#.*$)/g, (match) => {
-            // Identify type
-            if (match.startsWith('#')) return addMarker(match, 'syntax-comment');
-            return addMarker(match, 'syntax-string');
-        });
-
-        // 3. Highlight Keywords and Builtins (now safe from strings/comments/tags)
-        // Keywords
-        processedLine = processedLine.replace(/\b(import|from|def|class|return|if|else|elif|for|while|try|except|with|as|pass|break|continue|global|lambda|yield)\b/g, '<span class="syntax-keyword">$1</span>');
-
-        // Builtins
-        processedLine = processedLine.replace(/\b(print|len|range|open|str|int|float|list|dict|set|tuple|bool|type|dir|help)\b/g, '<span class="syntax-builtin">$1</span>');
-
-        // 4. Restore Markers
-        markers.forEach(marker => {
-            processedLine = processedLine.replace(marker.id, `<span class="${marker.type}">${marker.content}</span>`);
-        });
-
-        // Ensure empty lines have height
-        if (processedLine === '') processedLine = '<br>';
-
-        htmlContent += `<div>${processedLine}</div>`;
-    });
-
-    codeContent.innerHTML = htmlContent;
-    updateLineNumbers(lines.length);
+    // Add line numbers based on newlines
+    const lineCount = content.split('\n').length;
+    updateLineNumbers(lineCount);
 
     // Simple line number sync (Optimized)
     codeContent.oninput = () => {
-        const text = codeContent.innerText; // InnerText preserves newlines usually
-        // innerText behavior can be tricky with divs. 
-        // But for line counting it's usually sufficient.
-        // Note: editing naturally removes spans, reverting to plain text.
-        // This is "functional" as requested.
+        const text = codeContent.innerText;
         const currentCheck = text.split('\n').length;
-        if (currentCheck !== lines.length) { // Check against *current* visual lines basically
-            // We just update logic based on current content count
-            // But 'lines.length' is stale closure var. 
-            // Just count.
+        if (currentCheck !== lineCount) {
+            updateLineNumbers(currentCheck);
         }
-        updateLineNumbers(currentCheck);
     };
 
     codeContent.onkeydown = (e) => {

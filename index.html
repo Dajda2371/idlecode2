@@ -29,6 +29,16 @@
             --idle-text: #000000;
             --explorer-bg: #f3f3f3;
         }
+
+        /* Syntax Highlighting (highlight.js mapping) */
+        .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-link { color: var(--idle-keyword); }
+        .hljs-function .hljs-keyword { color: var(--idle-keyword); }
+        .hljs-built_in, .hljs-attr, .hljs-attribute, .hljs-code, .hljs-title.class_ { color: var(--idle-builtin); }
+        .hljs-string, .hljs-meta .hljs-string, .hljs-type, .hljs-doctag { color: var(--idle-string); }
+        .hljs-comment, .hljs-quote, .hljs-variable.language_ { color: var(--idle-comment); }
+        .hljs-number, .hljs-regexp, .hljs-symbol, .hljs-bullet, .hljs-meta { color: var(--idle-text); } /* IDLE usually just black for numbers */
+        .hljs-title.function_ { color: #0000ff; } /* IDLE uses blue for function defs */
+
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
             font-size: 18px;
