@@ -231,6 +231,7 @@ function createWindow() {
                     label: 'Console',
                     type: 'checkbox',
                     checked: true,
+                    id: 'menu-view-console', // Added ID
                     click: (menuItem) => win.webContents.send('toggle-console', menuItem.checked)
                 },
                 {
@@ -387,6 +388,14 @@ ipcMain.on('new-console-window', () => {
 ipcMain.on('close-popped-consoles', () => {
     poppedConsoles.forEach(w => w.close());
     poppedConsoles = [];
+});
+
+ipcMain.on('update-menu-checkbox', (event, menuId, checked) => {
+    const menu = Menu.getApplicationMenu();
+    const item = menu.getMenuItemById(menuId);
+    if (item) {
+        item.checked = checked;
+    }
 });
 
 

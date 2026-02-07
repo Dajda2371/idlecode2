@@ -700,14 +700,17 @@ if (hideConsoleBtn) {
         const consoleArea = document.getElementById('console-area');
         if (consoleArea) {
             consoleArea.style.display = 'none';
-            // Also notify main process so menu checkbox updates if needed?
-            // Or just let main process handle the "toggle-console" logic if we dispatched an event.
-            // But simpler here: just hide locally. The menu item might get out of sync 
-            // unless we send a message back.
-            // Let's send a message if possible, or just hide.
-            // Actually, the toggle in main.js sends 'toggle-console'.
-            // We don't have a reverse channel 'console-toggled' easily without custom logic.
-            // For now, let's just hide it. The user can re-open via menu.
+            // Sync menu state
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
+
+            // Trigger pop-out logic manually since we are hiding directly
+            consoles.forEach(c => {
+                if (c.filePath) {
+                    ipcRenderer.send('run-module-popout', c.filePath);
+                } else {
+                    ipcRenderer.send('new-console-window');
+                }
+            });
         }
     };
 }
