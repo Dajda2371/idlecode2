@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>IDLE Console</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'idle-bg': '#ffffff',
+                        'idle-keyword': '#ff7b00',
+                        'idle-builtin': '#900090',
+                        'idle-string': '#00aa00',
+                        'idle-comment': '#dd0000',
+                        'idle-text': '#000000',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-white;
+                font-family: 'Courier New', Courier, monospace;
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col bg-white font-mono text-[13px]" id="console-area">
+        <div
+            class="bg-gray-100 px-2 py-1 text-xs text-gray-500 border-b border-gray-200 flex justify-between select-none">
+            <span>Interactive Console</span>
+            <span class="cursor-pointer hover:text-red-500" id="clear-console-btn">Clear</span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2" id="console-output">
+            <div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>
+        </div>
+        <div class="flex items-center border-t border-gray-200 px-2 bg-white">
+            <span class="text-idle-keyword font-bold mr-2 select-none">&gt;&gt;&gt;</span>
+            <input type="text"
+                class="flex-1 py-1 outline-none text-black bg-transparent border-none font-mono text-[13px] h-8"
+                id="console-input" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+    <script src="console-renderer.js"></script>
+</body>
+
+</html>

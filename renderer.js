@@ -468,6 +468,27 @@ clearConsoleBtn.addEventListener('click', () => {
     consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
 });
 
+const popOutBtn = document.getElementById('pop-out-console-btn');
+
+if (popOutBtn) {
+    popOutBtn.addEventListener('click', () => {
+        ipcRenderer.send('pop-out-console');
+
+        // Hide local console area
+        const consoleArea = document.getElementById('console-area');
+        if (consoleArea) {
+            consoleArea.style.display = 'none';
+        }
+
+        // Kill local python process to avoid overhead if desired, or keep it. 
+        // Let's kill it to simulate "moving" it.
+        if (pythonProcess) {
+            pythonProcess.kill();
+            pythonProcess = null;
+        }
+    });
+}
+
 // Start shell on load
 initPythonShell();
 
