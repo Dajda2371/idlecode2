@@ -663,6 +663,13 @@ const clearConsoleBtn = document.getElementById('clear-console-btn');
 const consoleList = document.getElementById('console-list');
 const addConsoleBtn = document.getElementById('add-console-btn');
 const activeConsoleTitle = document.getElementById('active-console-title');
+const closeActiveConsoleBtn = document.getElementById('close-active-console-btn');
+
+if (closeActiveConsoleBtn) {
+    closeActiveConsoleBtn.onclick = () => {
+        if (activeConsoleId) closeConsole(activeConsoleId);
+    };
+}
 
 function createConsole(name = null, filePath = null) {
     // Calculate next ID strictly based on max + 1
@@ -743,6 +750,7 @@ function switchConsole(id) {
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
 
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
+    if (closeActiveConsoleBtn) closeActiveConsoleBtn.classList.remove('hidden'); // Show X
 
     renderConsoleList();
     consoleInput.focus();
@@ -764,6 +772,7 @@ function closeConsole(id) {
         // Clear UI
         consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
         if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
+        if (closeActiveConsoleBtn) closeActiveConsoleBtn.classList.add('hidden'); // Hide X
         renderConsoleList();
     } else {
         if (activeConsoleId === id) {
