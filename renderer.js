@@ -1057,9 +1057,12 @@ if (Object.keys(consoles).length === 0) {
 const popOutBtn = document.getElementById('pop-out-console-btn');
 if (popOutBtn) {
     popOutBtn.addEventListener('click', () => {
-        ipcRenderer.send('pop-out-console');
-        // Optional: Hide local console if popped out?
-        // For now, let's just pop out a new one.
+        if (activeConsoleId) {
+            const c = consoles.find(x => x.id === activeConsoleId);
+            if (c) {
+                ipcRenderer.send('pop-out-session', c.id, c.name);
+            }
+        }
     });
 }
 

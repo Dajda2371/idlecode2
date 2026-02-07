@@ -379,6 +379,10 @@ ipcMain.on('new-console-window', () => {
     subWin.loadFile('console.html');
     poppedConsoles.push(subWin);
 
+    subWin.webContents.once('did-finish-load', () => {
+        subWin.webContents.send('run-file', null);
+    });
+
     subWin.on('closed', () => {
         const idx = poppedConsoles.indexOf(subWin);
         if (idx > -1) poppedConsoles.splice(idx, 1);

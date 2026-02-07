@@ -15,6 +15,14 @@ ipcRenderer.on('attach-to-session', (event, sessionId) => {
     ipcRenderer.send('session-attach', sessionId);
 });
 
+ipcRenderer.on('run-file', (event, filePath) => {
+    const sessionId = Date.now();
+    currentSessionId = sessionId;
+    // Create a new session for this file
+    ipcRenderer.send('session-create', sessionId, filePath);
+    ipcRenderer.send('session-attach', sessionId);
+});
+
 // Receive full state on attach
 ipcRenderer.on('session-history', (event, sessionId, history, cmdHistory, draft) => {
     if (sessionId !== currentSessionId) return;
