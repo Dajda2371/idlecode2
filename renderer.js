@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ipcRenderer } = require('electron');
+const { spawn } = require('child_process'); // Added spawn
 const hljs = require('highlight.js/lib/core');
 hljs.registerLanguage('python', require('highlight.js/lib/languages/python'));
 
@@ -632,165 +633,281 @@ ipcRenderer.on('menu-new-console', () => {
 });
 
 
+
 function runPythonMetadata(path) {
     if (!path) return;
 
-    // Clear console
-    consoleOutput.innerHTML = '';
-    const div = document.createElement('div');
-    div.className = 'text-gray-500 mb-1';
-    div.textContent = `=== RESTART: ${path} ===`;
-    consoleOutput.appendChild(div);
-
-    // Restart logic: Kill existing, start new with file
-    if (pythonProcess) {
-        pythonProcess.kill();
+    // Use active console or create one
+    let targetConsole;
+    if (activeConsoleId) {
+        targetConsole = consoles.find(c => c.id === activeConsoleId);
     }
 
-    // Spawn new process running the file
-    // Note: IDLE runs the file and then enters interactive mode. 
-    // python -i file.py
-    pythonProcess = spawn('python3', ['-i', '-u', path]);
-
-    pythonProcess.stdout.on('data', (data) => {
-        appendConsoleOutput(data.toString(), 'text-blue-600');
-    });
-
-    // ... rest of handlers ...
-    pythonProcess.stderr.on('data', (data) => {
-        const text = data.toString();
-        if (text.trim() === '>>>' || text.trim() === '...') return;
-        appendConsoleOutput(text, 'text-red-500');
-    });
-
-    pythonProcess.on('close', (code) => {
-        appendConsoleOutput(`\n>>> `, 'text-[var(--idle-keyword)] font-bold');
-    });
+    if (!targetConsole) {
+        createConsole(`Run: ${path.split(/[/\\]/).pop()}`, path);
+    } else {
+        // Restart existing console with this file
+        spawnConsoleProcess(targetConsole, path);
+    }
 }
 
 
+// Console State
+let consoles = [];
+let activeConsoleId = null;
+let nextConsoleId = 1;
 
-
-
-// --- Console Logic ---
-const { spawn } = require('child_process');
-
-let pythonProcess = null;
+// Elements
 const consoleOutput = document.getElementById('console-output');
 const consoleInput = document.getElementById('console-input');
 const clearConsoleBtn = document.getElementById('clear-console-btn');
+const consoleList = document.getElementById('console-list');
+const addConsoleBtn = document.getElementById('add-console-btn');
+const activeConsoleTitle = document.getElementById('active-console-title');
 
-function initPythonShell() {
-    // Spawn python3 in interactive mode (-i) and unbuffered (-u)
-    // We use -i to force interactive mode even though it's a pipe.
-    pythonProcess = spawn('python3', ['-i', '-u']);
+function createConsole(name = `Shell ${nextConsoleId}`, filePath = null) {
+    const id = nextConsoleId++;
+    const consoleData = {
+        id,
+        name,
+        process: null,
+        history: '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>', // HTML history
+        commandHistory: [],
+        historyIndex: -1,
+        filePath
+    };
 
-    pythonProcess.stdout.on('data', (data) => {
-        appendConsoleOutput(data.toString(), 'text-blue-600'); // IDLE stdout is blue
-    });
+    consoles.push(consoleData);
+    spawnConsoleProcess(consoleData, filePath);
 
-    pythonProcess.stderr.on('data', (data) => {
-        // Python interactive mode echoes the prompt to stderr usually
-        const text = data.toString();
-        if (text.trim() === '>>>' || text.trim() === '...') {
-            // These prompts are handled by our UI, we might want to ignore them 
-            // or we might want to show them if we want exact behavior.
-            // For now, let's ignore the generic prompts because we have our own input field prompt
-            return;
+    // Switch to new console immediately
+    switchConsole(id);
+    renderConsoleList();
+    return consoleData;
+}
+
+function spawnConsoleProcess(consoleData, filePath = null) {
+    if (consoleData.process) {
+        try { consoleData.process.kill(); } catch (e) { }
+    }
+
+    const args = filePath ? ['-i', '-u', filePath] : ['-i', '-u'];
+    // If restarting with file, update name + history header
+    if (filePath) {
+        consoleData.name = `Run: ${path.basename(filePath)}`;
+        consoleData.filePath = filePath;
+        consoleData.history += `<div class="text-gray-500 mb-1 mt-2">=== RESTART: ${filePath} ===</div>`;
+        if (activeConsoleId === consoleData.id) {
+            updateConsoleDOM(consoleData);
         }
-        appendConsoleOutput(text, 'text-red-500'); // IDLE stderr is red
+    }
+
+    const proc = spawn('python3', args);
+    consoleData.process = proc;
+
+    proc.stdout.on('data', (data) => {
+        appendConsoleData(consoleData, data.toString(), 'text-blue-600');
     });
 
-    pythonProcess.on('close', (code) => {
-        appendConsoleOutput(`\nProcess exited with code ${code}\n`, 'text-gray-500');
-        pythonProcess = null;
+    proc.stderr.on('data', (data) => {
+        const text = data.toString();
+        if (text.trim() === '>>>' || text.trim() === '...') return;
+        appendConsoleData(consoleData, text, 'text-red-500');
+    });
+
+    proc.on('close', (code) => {
+        appendConsoleData(consoleData, `\nProcess exited with code ${code}\n`, 'text-gray-500');
+        consoleData.process = null;
+        renderConsoleList(); // Update status icon if we add one
+
+        // Auto-restart simple shell? No, IDLE doesn't auto-restart dead shell unless requested.
+        // It shows the prompt usually.
+        appendConsoleData(consoleData, `\n>>> `, 'text-[var(--idle-keyword)] font-bold');
     });
 }
 
-function appendConsoleOutput(text, colorClass) {
-    const span = document.createElement('span');
-    span.className = `${colorClass} whitespace-pre-wrap font-mono`;
-    span.textContent = text;
+function switchConsole(id) {
+    const target = consoles.find(c => c.id === id);
+    if (!target) return;
 
-    // Check if the last element is a span, merge if same color to avoid too many nodes? 
-    // Simplified: just append div or span.
-    // Use div for blocks?
-    const div = document.createElement('div');
-    div.className = `${colorClass} whitespace-pre-wrap break-all`;
-    div.textContent = text;
-
-    consoleOutput.appendChild(div);
+    activeConsoleId = id;
+    consoleOutput.innerHTML = target.history;
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
+
+    if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
+
+    renderConsoleList();
+    consoleInput.focus();
+}
+
+function closeConsole(id) {
+    const idx = consoles.findIndex(c => c.id === id);
+    if (idx === -1) return;
+
+    const target = consoles[idx];
+    if (target.process) target.process.kill();
+
+    consoles.splice(idx, 1);
+
+    if (consoles.length === 0) {
+        // Create a default one if all closed
+        createConsole();
+    } else {
+        if (activeConsoleId === id) {
+            // Switch to previous or first
+            const newTarget = consoles[idx - 1] || consoles[0];
+            switchConsole(newTarget.id);
+        } else {
+            renderConsoleList();
+        }
+    }
+}
+
+function renderConsoleList() {
+    consoleList.innerHTML = '';
+
+    consoles.forEach(c => {
+        const item = document.createElement('div');
+        const isActive = c.id === activeConsoleId;
+
+        item.className = `flex items-center justify-between px-2 py-1.5 cursor-pointer text-xs group ${isActive ? 'bg-white border-l-2 border-blue-500 shadow-sm' : 'hover:bg-gray-200 border-l-2 border-transparent'}`;
+
+        const leftDiv = document.createElement('div');
+        leftDiv.className = 'flex items-center gap-2 truncate';
+
+        // Icon
+        const icon = document.createElement('span');
+        icon.className = 'material-symbols-outlined !text-[14px] text-gray-500';
+        icon.textContent = c.filePath ? 'play_circle' : 'terminal';
+        if (isActive) icon.classList.add('text-blue-600');
+
+        const name = document.createElement('span');
+        name.textContent = c.name;
+        name.className = `truncate ${isActive ? 'font-semibold text-gray-800' : 'text-gray-600'}`;
+
+        leftDiv.appendChild(icon);
+        leftDiv.appendChild(name);
+
+        // Actions (Delete)
+        const closeBtn = document.createElement('span');
+        closeBtn.className = 'material-symbols-outlined !text-[14px] text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity';
+        closeBtn.textContent = 'delete';
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            closeConsole(c.id);
+        };
+
+        item.appendChild(leftDiv);
+        item.appendChild(closeBtn);
+
+        item.onclick = () => switchConsole(c.id);
+
+        consoleList.appendChild(item);
+    });
+}
+
+function appendConsoleData(consoleData, text, colorClass) {
+    if (!text) return;
+
+    // Create HTML snippet
+    // We store HTML string to keep it simple, but we could store objects and re-render.
+    // HTML string is dangerous if we don't escape, but here we control classes.
+    // Text content needs escaping if we use innerHTML for history.
+
+    const escapedText = escapeHtml(text);
+    const htmlSnippet = `<div class="${colorClass} whitespace-pre-wrap break-all">${escapedText}</div>`;
+
+    consoleData.history += htmlSnippet;
+
+    // If active, append to DOM
+    if (activeConsoleId === consoleData.id) {
+        const div = document.createElement('div');
+        div.className = `${colorClass} whitespace-pre-wrap break-all`;
+        div.textContent = text; // textContent handles escaping automatically for display
+        consoleOutput.appendChild(div);
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
 }
 
 // Input Handling
-let commandHistory = [];
-let historyIndex = -1;
-
 consoleInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
+        if (!activeConsoleId) return;
+
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
+        if (!currentConsole) return;
+
         const command = consoleInput.value;
+        const escapedCommand = escapeHtml(command);
 
         // Echo command
+        const echoHtml = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapedCommand}</span></div>`;
+        currentConsole.history += echoHtml;
+
+        // Render Echo
         const echoDiv = document.createElement('div');
-        echoDiv.innerHTML = `<span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapeHtml(command)}</span>`;
+        echoDiv.className = "mt-1";
+        echoDiv.innerHTML = `<span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapedCommand}</span>`;
         consoleOutput.appendChild(echoDiv);
 
-        if (pythonProcess) {
-            pythonProcess.stdin.write(command + '\n');
+        if (currentConsole.process) {
+            currentConsole.process.stdin.write(command + '\n');
         } else {
-            appendConsoleOutput('Python process is not running. Restarting...', 'text-gray-500');
-            initPythonShell();
-            if (pythonProcess) pythonProcess.stdin.write(command + '\n');
+            appendConsoleData(currentConsole, 'Python process is not running. Restarting...', 'text-gray-500');
+            spawnConsoleProcess(currentConsole, currentConsole.filePath);
+            if (currentConsole.process) currentConsole.process.stdin.write(command + '\n');
         }
 
-        commandHistory.push(command);
-        historyIndex = commandHistory.length;
+        currentConsole.commandHistory.push(command);
+        currentConsole.historyIndex = currentConsole.commandHistory.length;
         consoleInput.value = '';
         consoleOutput.scrollTop = consoleOutput.scrollHeight;
     } else if (e.key === 'ArrowUp') {
-        if (historyIndex > 0) {
-            historyIndex--;
-            consoleInput.value = commandHistory[historyIndex];
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
+        if (currentConsole && currentConsole.historyIndex > 0) {
+            currentConsole.historyIndex--;
+            consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex];
         }
     } else if (e.key === 'ArrowDown') {
-        if (historyIndex < commandHistory.length - 1) {
-            historyIndex++;
-            consoleInput.value = commandHistory[historyIndex];
-        } else {
-            historyIndex = commandHistory.length;
-            consoleInput.value = '';
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
+        if (currentConsole) {
+            if (currentConsole.historyIndex < currentConsole.commandHistory.length - 1) {
+                currentConsole.historyIndex++;
+                consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex];
+            } else {
+                currentConsole.historyIndex = currentConsole.commandHistory.length;
+                consoleInput.value = '';
+            }
         }
     }
 });
 
 clearConsoleBtn.addEventListener('click', () => {
-    consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
+    if (activeConsoleId) {
+        const c = consoles.find(x => x.id === activeConsoleId);
+        c.history = '<div class="text-gray-500 mb-1">Cleared.</div>';
+        consoleOutput.innerHTML = c.history;
+    }
 });
 
-const popOutBtn = document.getElementById('pop-out-console-btn');
-
-if (popOutBtn) {
-    popOutBtn.addEventListener('click', () => {
-        ipcRenderer.send('pop-out-console');
-
-        // Hide local console area
-        const consoleArea = document.getElementById('console-area');
-        if (consoleArea) {
-            consoleArea.style.display = 'none';
-        }
-
-        // Kill local python process to avoid overhead if desired, or keep it. 
-        // Let's kill it to simulate "moving" it.
-        if (pythonProcess) {
-            pythonProcess.kill();
-            pythonProcess = null;
-        }
+if (addConsoleBtn) {
+    addConsoleBtn.addEventListener('click', () => {
+        createConsole();
     });
 }
 
-// Start shell on load
-initPythonShell();
+// Start default shell
+createConsole();
+
+const popOutBtn = document.getElementById('pop-out-console-btn');
+if (popOutBtn) {
+    popOutBtn.addEventListener('click', () => {
+        ipcRenderer.send('pop-out-console');
+        // Optional: Hide local console if popped out?
+        // For now, let's just pop out a new one.
+    });
+}
+
 
 
 // --- New Navigation Feature Handlers ---

@@ -224,27 +224,46 @@
             </div>
 
             <!-- Console Area -->
-            <div class="h-[250px] flex flex-col border-t border-gray-300 bg-white font-mono text-[13px]"
-                id="console-area">
-                <div
-                    class="bg-gray-100 px-2 py-1 text-xs text-gray-500 border-b border-gray-200 flex justify-between select-none">
-                    <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined">close</span>
-                        <span>Interactive Console</span>
+            <div class="h-[250px] flex border-t border-gray-300 bg-white font-mono text-[13px]" id="console-area">
+
+                <!-- Main Console (Left) -->
+                <div class="flex-1 flex flex-col overflow-hidden relative min-w-0">
+                    <div
+                        class="bg-gray-100 px-2 py-1 text-xs text-gray-500 border-b border-gray-200 flex justify-between select-none shrink-0">
+                        <div class="flex items-center gap-2">
+                            <!-- Mobile/Small screen toggle for sidebar could go here if needed -->
+                            <span class="font-bold text-gray-600" id="active-console-title">Interactive Console</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="cursor-pointer hover:text-red-500" id="pop-out-console-btn">Pop Out</span>
+                            <span class="cursor-pointer hover:text-red-500" id="clear-console-btn">Clear</span>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <span class="cursor-pointer hover:text-red-500" id="pop-out-console-btn">Pop Out</span>
-                        <span class="cursor-pointer hover:text-red-500" id="clear-console-btn">Clear</span>
+                    <div class="flex-1 overflow-y-auto p-2" id="console-output">
+                        <!-- Content will be injected by js -->
+                    </div>
+                    <div class="flex items-center border-t border-gray-200 px-2 bg-white shrink-0">
+                        <span class="text-[var(--idle-keyword)] font-bold mr-2 select-none">&gt;&gt;&gt;</span>
+                        <input type="text"
+                            class="flex-1 py-1 outline-none text-black bg-transparent border-none font-mono text-[13px] h-8"
+                            id="console-input" autocomplete="off" spellcheck="false">
                     </div>
                 </div>
-                <div class="flex-1 overflow-y-auto p-2" id="console-output">
-                    <div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>
-                </div>
-                <div class="flex items-center border-t border-gray-200 px-2 bg-white">
-                    <span class="text-[var(--idle-keyword)] font-bold mr-2 select-none">&gt;&gt;&gt;</span>
-                    <input type="text"
-                        class="flex-1 py-1 outline-none text-black bg-transparent border-none font-mono text-[13px] h-8"
-                        id="console-input" autocomplete="off" spellcheck="false">
+
+                <!-- Console List Sidebar (Right) -->
+                <div class="w-[180px] border-l border-gray-200 flex flex-col bg-gray-50 text-[12px] font-sans shrink-0">
+                    <div
+                        class="flex items-center justify-between px-2 py-1 border-b border-gray-200 bg-gray-100 h-[25px]">
+                        <span class="font-bold text-gray-500 text-[10px] tracking-wider">SHELL SESSIONS</span>
+                        <button id="add-console-btn"
+                            class="hover:bg-gray-300 rounded text-gray-600 flex items-center justify-center p-0.5"
+                            title="New Console">
+                            <span class="material-symbols-outlined !text-[14px]">add</span>
+                        </button>
+                    </div>
+                    <div id="console-list" class="flex-1 overflow-y-auto">
+                        <!-- List Items -->
+                    </div>
                 </div>
             </div>
         </main>
