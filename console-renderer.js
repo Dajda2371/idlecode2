@@ -169,15 +169,6 @@ let currentIndentLevel = 0;
 ipcRenderer.on('session-prompt', (event, sessionId, type) => {
     if (sessionId !== currentSessionId) return;
 
-    // Find prompt element
-    // console-renderer.js renders prompts differently?
-    // In console-renderer, we render echo lines via 'appendEntry({type:'input'})' which has hardcoded '>>>'.
-    // We need to change that to dynamic prompt.
-    // And we need to change CURRENT prompt which is effectively just 'consoleInput' placeholder/styling?
-    // Wait, console-renderer.js has this HTML structure:
-    // <span class="text-idle-keyword ...">>>></span> <input ...>
-    // We need to target that span. Let's give it an ID first in console.html or find it here.
-
     const promptSpan = document.getElementById('console-prompt');
 
     if (type === 'standard') {
@@ -187,23 +178,23 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
         consoleInput.value = '';
     } else if (type === 'continuation') {
         // Calculate based on history
-        // Access 'commandHistory' in this scope
         const lastCmd = commandHistory[commandHistory.length - 1] || '';
 
-        let spaces = 0;
+        // Count leading 4-space tabs
         const match = lastCmd.match(/^ */);
-        if (match) spaces = match[0].length;
+        const spaces = match ? match[0].length : 0;
 
         let indents = Math.floor(spaces / 4);
 
-        if (lastCmd.trim().endsWith(':')) {
+        const uncommented = lastCmd.split('#')[0].trim();
+        if (uncommented.endsWith(':')) {
             indents += 1;
         }
 
         currentIndentLevel = indents;
 
-        let promptText = '...';
-        if (indents > 0) promptText = `${indents} . . .`;
+        // User requested ". . ."
+        const promptText = '. . .';
 
         currentPromptText = promptText;
         if (promptSpan) promptSpan.innerText = promptText;
@@ -211,6 +202,32 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
         // Auto-fill input
         if (indents > 0) {
             consoleInput.value = '    '.repeat(indents);
+        }
+    }
+});
+
+// Tab and Smart Backspace
+consoleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        const val = consoleInput.value;
+        consoleInput.value = val.substring(0, start) + "    " + val.substring(end);
+        consoleInput.selectionStart = consoleInput.selectionEnd = start + 4;
+    } else if (e.key === 'Backspace') {
+        // Only if cursor is just a cursor (no selection range) and preceded by 4 spaces
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+
+        if (start === end && start >= 4) {
+            const val = consoleInput.value;
+            // Check if the 4 chars before cursor are spaces
+            if (val.substring(start - 4, start) === '    ') {
+                e.preventDefault();
+                consoleInput.value = val.substring(0, start - 4) + val.substring(start);
+                consoleInput.selectionStart = consoleInput.selectionEnd = start - 4;
+            }
         }
     }
 });
