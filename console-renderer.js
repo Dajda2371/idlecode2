@@ -82,16 +82,9 @@ function appendEntry(entry) {
         // Render as prompt echo
         const div = document.createElement('div');
         div.className = "mt-1";
-        // Use currentPromptText which reflects the prompt active when this input was typed
-        // Note: This relies on currentPromptText not changing before echo arrives.
-        // Echo arrives immediately on Enter from Renderer->Main->Renderer (instant).
 
-        let promptHtml = `<span class="text-idle-keyword font-bold mr-2 select-none">${currentPromptText}</span>`;
-        if (currentPromptText !== '>>>') {
-            // Maybe different style for indentation prompt? IDLE usually keeps color.
-            // But "1 . . ." usually is just text.
-            promptHtml = `<span class="text-idle-keyword font-bold mr-2 select-none">${currentPromptText}</span>`;
-        }
+        const promptText = entry.prompt || currentPromptText || '>>>';
+        let promptHtml = `<span class="text-idle-keyword font-bold mr-2 select-none">${escapeHtml(promptText)}</span>`;
 
         div.innerHTML = `${promptHtml}<span>${escapeHtml(entry.text)}</span>`;
         consoleOutput.appendChild(div);
@@ -162,6 +155,10 @@ consoleInput.addEventListener('keydown', (e) => {
             // Normal command handling
             // Send to Main (it will echo back as 'input' type)
             ipcRenderer.send('session-input', currentSessionId, command);
+
+            // Hide the prompt immediately
+            const promptSpan = document.getElementById('console-prompt');
+            if (promptSpan) promptSpan.style.display = 'none';
 
             // Clear input
             consoleInput.value = '';

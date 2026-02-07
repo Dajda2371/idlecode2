@@ -712,7 +712,8 @@ ipcRenderer.on('session-output', (event, sessionId, entry) => {
     if (!consoleData) return;
 
     if (entry.type === 'input') {
-        const html = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapeHtml(entry.text)}</span></div>`;
+        const promptText = entry.prompt || '>>>';
+        const html = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">${escapeHtml(promptText)}</span><span>${escapeHtml(entry.text)}</span></div>`;
         consoleData.history += html;
         if (activeConsoleId === sessionId) {
             const div = document.createElement('div');
@@ -1034,6 +1035,10 @@ consoleInput.addEventListener('keydown', (e) => {
             // Send to Main (it will echo back as 'input' type which we render)
             ipcRenderer.send('session-input', currentConsole.id, command);
 
+            // Hide the prompt immediately to allow stretching if next state is input() 
+            // the prompt will be shown again when session-prompt or session-input-prompt is received
+            if (consolePrompt) consolePrompt.style.display = 'none';
+
             // Clear input and draft
             consoleInput.value = '';
             currentConsole.inputDraft = '';
@@ -1086,23 +1091,16 @@ clearConsoleBtn.addEventListener('click', () => {
 // Prompt Handling
 // Prompt Handling
 ipcRenderer.on('session-prompt', (event, sessionId, type) => {
-    console.log(`[RENDERER] session-prompt received: sessionId=${sessionId}, type=${type}, activeConsoleId=${activeConsoleId}`);
-
     const consoleData = consoles.find(c => c.id === sessionId);
-    if (!consoleData) {
-        console.log('[RENDERER] No consoleData found for session:', sessionId);
-        return;
-    }
+    if (!consoleData) return;
 
     if (!consoleData.indentLevel) consoleData.indentLevel = 0;
 
     if (type === 'standard') {
         consoleData.indentLevel = 0;
         consoleData.promptText = '>>>';
-        console.log('[RENDERER] Set prompt to: >>>');
     } else if (type === 'continuation') {
         const lastCmd = consoleData.commandHistory[consoleData.commandHistory.length - 1] || '';
-        console.log('[RENDERER] Last command:', lastCmd);
 
         // Count leading 4-space tabs
         const match = lastCmd.match(/^ */);
@@ -1111,50 +1109,35 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
         let newIndent = currentIndent;
         // Check for colon in uncommented part
         const uncommented = lastCmd.split('#')[0].trim();
-        console.log('[RENDERER] Uncommented:', uncommented);
         if (uncommented.endsWith(':')) {
             newIndent = currentIndent + 1;
-            console.log('[RENDERER] Found colon, incrementing indent');
         }
 
         consoleData.indentLevel = newIndent;
 
         // User requested "..." for continuation
         consoleData.promptText = '...';
-        console.log(`[RENDERER] Set prompt to: . . . (indent level: ${newIndent})`);
     }
 
     // Update UI if active
     if (activeConsoleId === sessionId) {
-        console.log('[RENDERER] Updating active console prompt to:', consoleData.promptText);
         if (consolePrompt) {
             consolePrompt.innerText = consoleData.promptText;
-            console.log('[RENDERER] consolePrompt element updated');
-        } else {
-            console.log('[RENDERER] WARNING: consolePrompt element not found!');
         }
 
         // Auto-indent input
         if (type === 'continuation' && consoleData.indentLevel > 0) {
             if (!consoleInput.value) {
                 consoleInput.value = '    '.repeat(consoleData.indentLevel);
-                console.log('[RENDERER] Auto-indented input');
             }
         }
-    } else {
-        console.log('[RENDERER] Session is not active, skipping UI update');
     }
 });
 
 // Input Prompt Handling (for Python's input() function)
 ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
-    console.log(`[RENDERER] session-input-prompt received: sessionId=${sessionId}, promptText=${promptText}`);
-
     const consoleData = consoles.find(c => c.id === sessionId);
-    if (!consoleData) {
-        console.log('[RENDERER] No consoleData found for session:', sessionId);
-        return;
-    }
+    if (!consoleData) return;
 
     // Store that we're waiting for input and the prompt text
     consoleData.waitingForInput = true;
@@ -1162,7 +1145,6 @@ ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
 
     // Update UI if active
     if (activeConsoleId === sessionId) {
-        console.log('[RENDERER] Updating prompt for input:', promptText);
         if (consolePrompt) {
             if (promptText === '') {
                 // Empty prompt - hide the prompt element to stretch the input
