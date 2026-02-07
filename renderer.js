@@ -363,22 +363,40 @@ function renderCode(content) {
     lineNumbers.innerHTML = '';
     codeContent.innerHTML = '';
 
-    // We use a single text node or simple divs for editing to avoid complexity with contenteditable
-    // But to keep syntax highlighting, we need a smarter approach. 
-    // For now, let's load the text as plain text in the contenteditable div, 
-    // and rely on a simpler 'highlight on save' or 'highlight line' approach to avoid cursor jumping.
-    // ACTUALLY: A full syntax highlighter in contenteditable is hard. 
-    // Let's implement a simple version: Text is just text. We highlight only when not editing or use a backdrop?
-    // User requested "functional" not "perfect".
-    // Let's just dump the text in. Syntax highlighting will be lost on edit for now to keep it usable.
+    // We use innerHTML to support syntax highlighting.
+    // Note: contenteditable with complex HTML is fragile. 
+    // We will wrap lines in divs to behave like paragraphs.
 
-    codeContent.innerText = content;
+    let htmlContent = '';
+    lines.forEach((line) => {
+        let processedLine = escapeHtml(line);
+
+        // Simple Syntax Highlighting Regex
+        // Keywords
+        processedLine = processedLine.replace(/\b(import|from|def|class|return|if|else|elif|for|while|try|except|with|as|pass|break|continue|global|lambda|yield)\b/g, '<span class="syntax-keyword">$1</span>');
+        // Builtins
+        processedLine = processedLine.replace(/\b(print|len|range|open|str|int|float|list|dict|set|tuple|bool|type|dir|help)\b/g, '<span class="syntax-builtin">$1</span>');
+        // Strings (Simple quote matching, not perfect for multiline)
+        processedLine = processedLine.replace(/('.*?'|".*?")/g, '<span class="syntax-string">$1</span>');
+        // Comments
+        processedLine = processedLine.replace(/(#.*)$/g, '<span class="syntax-comment">$1</span>');
+
+        // Ensure empty lines have height
+        if (processedLine === '') processedLine = '<br>';
+
+        htmlContent += `<div>${processedLine}</div>`;
+    });
+
+    codeContent.innerHTML = htmlContent;
     updateLineNumbers(lines.length);
 
     // Simple line number sync
     codeContent.oninput = () => {
-        const lineCount = codeContent.innerText.split('\n').length;
-        updateLineNumbers(lineCount);
+        const currentCheck = codeContent.innerText.split('\n').length;
+        // Optimization: Only update if count changes
+        if (currentCheck !== lines.length) {
+            updateLineNumbers(currentCheck);
+        }
     };
 
     codeContent.onkeydown = (e) => {
