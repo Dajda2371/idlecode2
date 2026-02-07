@@ -567,19 +567,70 @@ ipcRenderer.on('option-zoom-out', () => { // Not in menu but good helper?
 
 
 
+ipcRenderer.on('toggle-ai-agent', (event, show) => {
+    // Assuming we have an AI Agent sidebar or panel.
+    // Let's create one or toggle existing if we had it.
+    // Based on previous code, we might not have a dedicated AI panel yet except 'console-area' or 'explorer'.
+    // Let's assume we want a right sidebar or similar.
+    let aiPanel = document.getElementById('ai-panel');
+    if (!aiPanel) {
+        // Create it if missing (stub)
+        aiPanel = document.createElement('div');
+        aiPanel.id = 'ai-panel';
+        aiPanel.className = 'w-[300px] border-l border-gray-200 bg-gray-50 flex flex-col hidden';
+        aiPanel.innerHTML = `
+            <div class="bg-gray-100 border-b border-gray-300 px-2 py-1 flex justify-between items-center font-bold text-xs">
+                <span>AI Agent</span>
+                <button onclick="document.getElementById('ai-panel').style.display='none'">X</button>
+            </div>
+            <div class="p-2 flex-1 overflow-auto text-xs">
+                AI Agent is ready.
+            </div>
+        `;
+        document.querySelector('main').appendChild(aiPanel);
+        // Adjust main flex direction? It is flex-row?
+        // <main> is flex-col. So appending AI panel at bottom? 
+        // We want it side-by-side with editor?
+        // Parent of <main> is <body> which is flex-col.
+        // <div class="flex-1 flex overflow-hidden"> contains <aside> and <main>.
+        // We should append to that container.
+        document.querySelector('.h-screen > div.flex-1').appendChild(aiPanel);
+    }
+
+    if (show) aiPanel.style.display = 'flex';
+    else aiPanel.style.display = 'none';
+});
+
 ipcRenderer.on('run-module', () => {
     // Save first
     if (currentFilePath) {
         const content = document.getElementById('code-content').innerText;
         fs.writeFileSync(currentFilePath, content);
 
-        // Run
-        runPythonMetadata(currentFilePath);
+        // Check if local console is visible
+        const consoleArea = document.getElementById('console-area');
+        const isConsoleVisible = consoleArea.style.display !== 'none';
+
+        if (isConsoleVisible) {
+            // Run locally
+            runPythonMetadata(currentFilePath);
+            // Ensure console is focused/shown
+            consoleArea.style.display = 'flex';
+        } else {
+            // Run in POP OUT (New Window)
+            // We need to tell Main process to spawn a new window that runs this file.
+            ipcRenderer.send('run-module-popout', currentFilePath);
+        }
     } else {
         alert('Please save the file before running.');
         ipcRenderer.send('save-as-request');
     }
 });
+
+ipcRenderer.on('menu-new-console', () => {
+    ipcRenderer.send('new-console-window');
+});
+
 
 function runPythonMetadata(path) {
     if (!path) return;
@@ -605,6 +656,7 @@ function runPythonMetadata(path) {
         appendConsoleOutput(data.toString(), 'text-blue-600');
     });
 
+    // ... rest of handlers ...
     pythonProcess.stderr.on('data', (data) => {
         const text = data.toString();
         if (text.trim() === '>>>' || text.trim() === '...') return;
@@ -613,8 +665,6 @@ function runPythonMetadata(path) {
 
     pythonProcess.on('close', (code) => {
         appendConsoleOutput(`\n>>> `, 'text-[var(--idle-keyword)] font-bold');
-        // We probably don't want to nullify pythonProcess here if we want to keep using it for shell?
-        // Actually -i keeps it open.
     });
 }
 

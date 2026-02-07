@@ -177,6 +177,10 @@ function createWindow() {
                 {
                     label: 'Python Shell',
                     click: () => win.webContents.send('menu-python-shell')
+                },
+                {
+                    label: 'New Shell Window',
+                    click: () => win.webContents.send('menu-new-console')
                 }
             ]
         },
@@ -329,3 +333,40 @@ app.on('window-all-closed', () => {
         app.quit()
     }
 })
+
+// --- Custom Console Logic ---
+const { ipcMain } = require('electron');
+
+// Pop out console / Run Module separately
+ipcMain.on('run-module-popout', (event, filePath) => {
+    const subWin = new BrowserWindow({
+        width: 800,
+        height: 600,
+        title: `Running: ${path.basename(filePath)}`,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+
+    subWin.loadFile('console.html'); // Ensure this file exists, or reuse index and hide editor?
+    // Let's reuse console.html (user has it in file list)
+
+    subWin.webContents.once('did-finish-load', () => {
+        subWin.webContents.send('run-file', filePath);
+    });
+});
+
+ipcMain.on('new-console-window', () => {
+    const subWin = new BrowserWindow({
+        width: 600,
+        height: 400,
+        title: 'IDLE Shell',
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+    subWin.loadFile('console.html');
+});
+
