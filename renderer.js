@@ -414,7 +414,7 @@ function updateLineNumbers(count) {
     for (let i = 1; i <= count; i++) {
         const numDiv = document.createElement('div');
         numDiv.textContent = i;
-        numDiv.className = 'h-[1.2em]'; // Approximate line height match
+        numDiv.className = 'h-[20px] leading-[20px]'; // Match CSS line-height exactly
         lineNumbers.appendChild(numDiv);
     }
 }
