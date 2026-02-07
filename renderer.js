@@ -364,22 +364,47 @@ function renderCode(content) {
     codeContent.innerHTML = '';
 
     // We use innerHTML to support syntax highlighting.
-    // Note: contenteditable with complex HTML is fragile. 
-    // We will wrap lines in divs to behave like paragraphs.
 
     let htmlContent = '';
+
     lines.forEach((line) => {
+        // 1. Escape HTML first to prevent XSS and standardize processing
         let processedLine = escapeHtml(line);
 
-        // Simple Syntax Highlighting Regex
+        // 2. Extract Strings and Comments to prevent keyword matching inside them or inside HTML tags
+        // We replace them with placeholders like VS_MARKER_0, VS_MARKER_1
+        const markers = [];
+        const addMarker = (content, type) => {
+            const id = `__VS_MARKER_${markers.length}__`;
+            markers.push({ id, content, type });
+            return id;
+        };
+
+        // Match strings (escaped quotes) and comments
+        // Note: Check for comments first? No, strings can contain #. Strings first.
+        // We need to match greedy but handled correctly.
+        // Ideally we iterate. But regex replace with callback is easier.
+        // We must handle mixed types. 
+        // A simple combined regex:
+        // /(&quot;.*?&quot;|&#039;.*?&#039;|#.*$)/g
+
+        processedLine = processedLine.replace(/(&quot;.*?&quot;|&#039;.*?&#039;|#.*$)/g, (match) => {
+            // Identify type
+            if (match.startsWith('#')) return addMarker(match, 'syntax-comment');
+            return addMarker(match, 'syntax-string');
+        });
+
+        // 3. Highlight Keywords and Builtins (now safe from strings/comments/tags)
         // Keywords
         processedLine = processedLine.replace(/\b(import|from|def|class|return|if|else|elif|for|while|try|except|with|as|pass|break|continue|global|lambda|yield)\b/g, '<span class="syntax-keyword">$1</span>');
+
         // Builtins
         processedLine = processedLine.replace(/\b(print|len|range|open|str|int|float|list|dict|set|tuple|bool|type|dir|help)\b/g, '<span class="syntax-builtin">$1</span>');
-        // Strings (Simple quote matching, not perfect for multiline)
-        processedLine = processedLine.replace(/('.*?'|".*?")/g, '<span class="syntax-string">$1</span>');
-        // Comments
-        processedLine = processedLine.replace(/(#.*)$/g, '<span class="syntax-comment">$1</span>');
+
+        // 4. Restore Markers
+        markers.forEach(marker => {
+            processedLine = processedLine.replace(marker.id, `<span class="${marker.type}">${marker.content}</span>`);
+        });
 
         // Ensure empty lines have height
         if (processedLine === '') processedLine = '<br>';
@@ -390,13 +415,20 @@ function renderCode(content) {
     codeContent.innerHTML = htmlContent;
     updateLineNumbers(lines.length);
 
-    // Simple line number sync
+    // Simple line number sync (Optimized)
     codeContent.oninput = () => {
-        const currentCheck = codeContent.innerText.split('\n').length;
-        // Optimization: Only update if count changes
-        if (currentCheck !== lines.length) {
-            updateLineNumbers(currentCheck);
+        const text = codeContent.innerText; // InnerText preserves newlines usually
+        // innerText behavior can be tricky with divs. 
+        // But for line counting it's usually sufficient.
+        // Note: editing naturally removes spans, reverting to plain text.
+        // This is "functional" as requested.
+        const currentCheck = text.split('\n').length;
+        if (currentCheck !== lines.length) { // Check against *current* visual lines basically
+            // We just update logic based on current content count
+            // But 'lines.length' is stale closure var. 
+            // Just count.
         }
+        updateLineNumbers(currentCheck);
     };
 
     codeContent.onkeydown = (e) => {
