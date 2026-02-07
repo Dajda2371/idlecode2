@@ -426,6 +426,7 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     // Handle Output
     pyProcess.stdout.on('data', (data) => {
         const str = data.toString();
+        console.log(`STDOUT DATA: ${JSON.stringify(str)}`);
         session.stdoutBuffer += str;
 
         // Check if this looks like an input prompt (no trailing newline)
@@ -438,6 +439,7 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
                     const promptText = session.stdoutBuffer;
                     session.waitingForInput = true;
 
+                    console.log(`Detected input prompt: ${JSON.stringify(promptText)}`);
                     // Signal that we're waiting for input (don't emit as output yet)
                     broadcastToSession(sessionId, 'session-input-prompt', promptText);
 
