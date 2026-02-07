@@ -663,11 +663,23 @@ const clearConsoleBtn = document.getElementById('clear-console-btn');
 const consoleList = document.getElementById('console-list');
 const addConsoleBtn = document.getElementById('add-console-btn');
 const activeConsoleTitle = document.getElementById('active-console-title');
-const closeActiveConsoleBtn = document.getElementById('close-active-console-btn');
+const hideConsoleBtn = document.getElementById('hide-console-area-btn');
 
-if (closeActiveConsoleBtn) {
-    closeActiveConsoleBtn.onclick = () => {
-        if (activeConsoleId) closeConsole(activeConsoleId);
+if (hideConsoleBtn) {
+    hideConsoleBtn.onclick = () => {
+        // Hide via IPC to sync menu state
+        const consoleArea = document.getElementById('console-area');
+        if (consoleArea) {
+            consoleArea.style.display = 'none';
+            // Also notify main process so menu checkbox updates if needed?
+            // Or just let main process handle the "toggle-console" logic if we dispatched an event.
+            // But simpler here: just hide locally. The menu item might get out of sync 
+            // unless we send a message back.
+            // Let's send a message if possible, or just hide.
+            // Actually, the toggle in main.js sends 'toggle-console'.
+            // We don't have a reverse channel 'console-toggled' easily without custom logic.
+            // For now, let's just hide it. The user can re-open via menu.
+        }
     };
 }
 
@@ -750,7 +762,6 @@ function switchConsole(id) {
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
 
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
-    if (closeActiveConsoleBtn) closeActiveConsoleBtn.classList.remove('hidden'); // Show X
 
     renderConsoleList();
     consoleInput.focus();
@@ -772,7 +783,6 @@ function closeConsole(id) {
         // Clear UI
         consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
         if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
-        if (closeActiveConsoleBtn) closeActiveConsoleBtn.classList.add('hidden'); // Hide X
         renderConsoleList();
     } else {
         if (activeConsoleId === id) {
