@@ -8,8 +8,15 @@ ipcRenderer.on('open-file', (event, filePath) => {
 });
 
 
+ipcRenderer.on('open-folder', (event, folderPath) => {
+    PROJECT_ROOT = folderPath;
+    document.title = path.basename(folderPath);
+    loadDirectory(PROJECT_ROOT, treeContainer);
+});
+
+
 // Configuration
-const PROJECT_ROOT = process.cwd();
+let PROJECT_ROOT = process.cwd();
 const ICONS = {
     folder: 'folder',
     folderOpen: 'folder_open',

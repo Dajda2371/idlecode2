@@ -39,7 +39,18 @@ function createWindow() {
                 },
                 { label: 'Recent Files', submenu: [{ label: 'No Recent Files', enabled: false }] },
                 { type: 'separator' },
-                { label: 'Open Folder...', accelerator: 'CmdOrCtrl+Shift+O' },
+                { 
+                    label: 'Open Folder...', 
+                    accelerator: 'CmdOrCtrl+Shift+O',
+                    click: async () => {
+                        const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+                            properties: ['openDirectory']
+                        })
+                        if (!canceled && filePaths.length > 0) {
+                            win.webContents.send('open-folder', filePaths[0])
+                        }
+                    }
+                },
                 { label: 'Recent Folders', submenu: [{ label: 'No Recent Folders', enabled: false }] },
                 { type: 'separator' },
                 { label: 'Open Module...', accelerator: 'Alt+M' },
