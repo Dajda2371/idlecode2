@@ -264,6 +264,7 @@ function createItemUI(isFolder) {
             } else {
                 fs.writeFileSync(newPath, '');
             }
+            inputContainer.remove(); // Remove the input before reloading
             loadDirectory(basePath, containerToAdd);
         } catch (err) {
             console.error(err);
