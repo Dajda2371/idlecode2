@@ -562,7 +562,7 @@ function renderCode(content) {
     };
 
     document.addEventListener('selectionchange', () => {
-        if (document.activeElement === codeContent || document.activeElement === consoleInput) {
+        if (document.activeElement === codeContent) {
             updateCaretPosition();
         }
     });
@@ -1029,12 +1029,7 @@ function switchConsole(id) {
     activeConsoleId = id;
     consoleOutput.innerHTML = target.history;
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
-
-    // Set text and highlight
-    consoleInput.innerText = target.inputDraft || '';
-    if (consoleInput.innerText) {
-        consoleInput.innerHTML = hljs.highlight(consoleInput.innerText, { language: 'python' }).value || '<br>';
-    }
+    consoleInput.value = target.inputDraft || '';
 
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
 
@@ -1043,10 +1038,6 @@ function switchConsole(id) {
 
     renderConsoleList();
     consoleInput.focus();
-
-    // Place cursor at end
-    const lastPos = (target.inputDraft || '').length;
-    setSelectionOffsets(consoleInput, lastPos, lastPos);
 }
 
 ipcRenderer.on('session-closed', (event, sessionId) => {
@@ -1157,28 +1148,31 @@ function appendConsoleData(consoleData, text, colorClass) {
 
 // Input Handling
 consoleInput.addEventListener('keydown', (e) => {
-    const { start, end } = getSelectionOffsets(consoleInput);
-    const val = consoleInput.innerText;
-    const currentConsole = consoles.find(c => c.id === activeConsoleId);
-
     if (e.key === 'Enter') {
-        e.preventDefault();
-        if (!activeConsoleId || !currentConsole) return;
+        if (!activeConsoleId) return;
 
-        const command = consoleInput.innerText;
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
+        if (!currentConsole) return;
+
+        const command = consoleInput.value;
         const isPromptHidden = consolePrompt && consolePrompt.style.display === 'none';
         const isInputResponse = currentConsole.waitingForInput || isPromptHidden;
 
+        // Check if we're waiting for input() response
         if (isInputResponse) {
+            // Create a line with the prompt in blue (stdout color) and input in black
             const div = document.createElement('div');
             div.className = "mt-1";
+
             const promptText = currentConsole.waitingForInput ? currentConsole.inputPromptText : "";
 
+            // Only show prompt if it's not empty
             if (promptText !== '') {
                 const promptSpan = `<span class="text-blue-600">${escapeHtml(promptText)}</span>`;
                 const inputSpan = `<span>${escapeHtml(command)}</span>`;
                 div.innerHTML = promptSpan + inputSpan;
             } else {
+                // Empty prompt - just show the input
                 div.innerHTML = `<span>${escapeHtml(command)}</span>`;
             }
 
@@ -1188,72 +1182,65 @@ consoleInput.addEventListener('keydown', (e) => {
                 outputContainer.scrollTop = outputContainer.scrollHeight;
             }
 
+            // Send just the user's input to Python, with isInputResponse=true
             ipcRenderer.send('session-input', currentConsole.id, command, true);
 
+            // Clear the waiting state
             currentConsole.waitingForInput = false;
             currentConsole.inputPromptText = '';
 
+            // Restore the normal prompt (and make it visible again)
             if (consolePrompt) {
                 consolePrompt.style.display = '';
                 consolePrompt.innerText = currentConsole.promptText || '>>>';
             }
 
-            consoleInput.innerText = '';
+            // Clear input
+            consoleInput.value = '';
             currentConsole.inputDraft = '';
             ipcRenderer.send('session-input-draft', currentConsole.id, '');
         } else {
+            // Normal command handling
+            // Send to Main (it will echo back as 'input' type which we render)
             ipcRenderer.send('session-input', currentConsole.id, command, false);
+
+            // Hide the prompt immediately to allow stretching if next state is input() 
+            // the prompt will be shown again when session-prompt or session-input-prompt is received
             if (consolePrompt) consolePrompt.style.display = 'none';
 
-            consoleInput.innerText = '';
+            // Clear input and draft
+            consoleInput.value = '';
             currentConsole.inputDraft = '';
             ipcRenderer.send('session-input-draft', currentConsole.id, '');
+
+            // Command history is updated when we receive the echo back in session-output
+
+            // Reset scroll?
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
         }
     } else if (e.key === 'ArrowUp') {
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole && currentConsole.historyIndex > 0) {
             currentConsole.historyIndex--;
-            const newText = currentConsole.commandHistory[currentConsole.historyIndex] || '';
-            consoleInput.innerText = newText;
-            consoleInput.innerHTML = hljs.highlight(newText, { language: 'python' }).value || '<br>';
-            setSelectionOffsets(consoleInput, newText.length, newText.length);
+            consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex] || '';
+            // Place cursor at the end
+            setTimeout(() => {
+                consoleInput.selectionStart = consoleInput.selectionEnd = consoleInput.value.length;
+            }, 0);
         }
     } else if (e.key === 'ArrowDown') {
+        const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole) {
             if (currentConsole.historyIndex < currentConsole.commandHistory.length - 1) {
                 currentConsole.historyIndex++;
-                const newText = currentConsole.commandHistory[currentConsole.historyIndex] || '';
-                consoleInput.innerText = newText;
-                consoleInput.innerHTML = hljs.highlight(newText, { language: 'python' }).value || '<br>';
-                setSelectionOffsets(consoleInput, newText.length, newText.length);
+                consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex] || '';
+                setTimeout(() => {
+                    consoleInput.selectionStart = consoleInput.selectionEnd = consoleInput.value.length;
+                }, 0);
             } else {
                 currentConsole.historyIndex = currentConsole.commandHistory.length;
-                consoleInput.innerText = '';
+                consoleInput.value = '';
             }
-        }
-    } else if (e.key === 'Tab') {
-        e.preventDefault();
-        const newVal = val.substring(0, start) + "    " + val.substring(end);
-        consoleInput.innerText = newVal;
-        consoleInput.innerHTML = hljs.highlight(newVal, { language: 'python' }).value || '<br>';
-        setSelectionOffsets(consoleInput, start + 4, start + 4);
-    } else if (e.key === 'Backspace') {
-        if (start === end && start >= 4 && val.substring(start - 4, start) === '    ') {
-            e.preventDefault();
-            const newVal = val.substring(0, start - 4) + val.substring(start);
-            consoleInput.innerText = newVal;
-            consoleInput.innerHTML = hljs.highlight(newVal, { language: 'python' }).value || '<br>';
-            setSelectionOffsets(consoleInput, start - 4, start - 4);
-        }
-    } else if (e.key === 'ArrowLeft') {
-        if (start === end && start >= 4 && val.substring(start - 4, start) === '    ') {
-            e.preventDefault();
-            setSelectionOffsets(consoleInput, start - 4, start - 4);
-        }
-    } else if (e.key === 'ArrowRight') {
-        if (start === end && start + 4 <= val.length && val.substring(start, start + 4) === '    ') {
-            e.preventDefault();
-            setSelectionOffsets(consoleInput, start + 4, start + 4);
         }
     }
 });
@@ -1262,14 +1249,8 @@ consoleInput.addEventListener('input', () => {
     if (activeConsoleId) {
         const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole) {
-            const { start, end } = getSelectionOffsets(consoleInput);
-            const text = consoleInput.innerText;
-            currentConsole.inputDraft = text;
-            ipcRenderer.send('session-input-draft', currentConsole.id, text);
-
-            // Highlight
-            consoleInput.innerHTML = hljs.highlight(text, { language: 'python' }).value || '<br>';
-            setSelectionOffsets(consoleInput, start, end);
+            currentConsole.inputDraft = consoleInput.value;
+            ipcRenderer.send('session-input-draft', currentConsole.id, consoleInput.value);
         }
     }
 });
@@ -1322,11 +1303,8 @@ ipcRenderer.on('session-prompt', (event, sessionId, type) => {
 
         // Auto-indent input
         if (type === 'continuation' && consoleData.indentLevel > 0) {
-            if (!consoleInput.innerText) {
-                const indent = '    '.repeat(consoleData.indentLevel);
-                consoleInput.innerText = indent;
-                consoleInput.innerHTML = hljs.highlight(indent, { language: 'python' }).value || '<br>';
-                setSelectionOffsets(consoleInput, indent.length, indent.length);
+            if (!consoleInput.value) {
+                consoleInput.value = '    '.repeat(consoleData.indentLevel);
             }
         }
     }
@@ -1354,11 +1332,51 @@ ipcRenderer.on('session-input-prompt', (event, sessionId, promptText) => {
             }
         }
         // Clear the input field
-        consoleInput.innerText = '';
+        consoleInput.value = '';
     }
 });
 
-// Tab handling now consolidated in the main consoleInput keydown listener above
+// Tab and Smart Backspace for Console Input
+consoleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        const val = consoleInput.value;
+        consoleInput.value = val.substring(0, start) + "    " + val.substring(end);
+        consoleInput.selectionStart = consoleInput.selectionEnd = start + 4;
+    } else if (e.key === 'Backspace') {
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        // Only if cursor is just a cursor (no selection range) and preceded by 4 spaces
+        if (start === end && start >= 4) {
+            const val = consoleInput.value;
+            if (val.substring(start - 4, start) === '    ') {
+                e.preventDefault();
+                consoleInput.value = val.substring(0, start - 4) + val.substring(start);
+                consoleInput.selectionStart = consoleInput.selectionEnd = start - 4;
+            }
+        }
+    } else if (e.key === 'ArrowLeft') {
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        const val = consoleInput.value;
+        // Only move by 4 if no selection and we can move back 4 spaces
+        if (start === end && start >= 4 && val.substring(start - 4, start) === '    ') {
+            e.preventDefault();
+            consoleInput.selectionStart = consoleInput.selectionEnd = start - 4;
+        }
+    } else if (e.key === 'ArrowRight') {
+        const start = consoleInput.selectionStart;
+        const end = consoleInput.selectionEnd;
+        const val = consoleInput.value;
+        // Only move by 4 if no selection and we can move forward 4 spaces
+        if (start === end && start + 4 <= val.length && val.substring(start, start + 4) === '    ') {
+            e.preventDefault();
+            consoleInput.selectionStart = consoleInput.selectionEnd = start + 4;
+        }
+    }
+});
 
 if (addConsoleBtn) {
     addConsoleBtn.addEventListener('click', () => {
