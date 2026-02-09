@@ -247,7 +247,7 @@ function createWindow() {
                 { type: 'separator' },
                 {
                     label: 'Toggle Sidebars',
-                    accelerator: 'CmdOrCtrl+*',
+                    accelerator: 'CmdOrCtrl+*', // On Windows, this usually maps to both standard shift+8 and Numpad *
                     click: () => win.webContents.send('toggle-sidebars')
                 }
             ]

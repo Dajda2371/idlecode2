@@ -970,10 +970,8 @@ ipcRenderer.on('toggle-console', (event, show) => {
         } else {
             el.style.display = 'none';
             if (resizer) resizer.style.display = 'none';
-            // Only pop out if not in ZEN mode hide (event is null for internal Zen Mode calls)
-            if (event !== null) {
-                consoles.forEach(c => ipcRenderer.send('pop-out-session', c.id, c.name));
-            }
+            // Pop Out: Always pop out if the console is being hidden
+            consoles.forEach(c => ipcRenderer.send('pop-out-session', c.id, c.name));
         }
     }
 });
