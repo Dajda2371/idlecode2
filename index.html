@@ -301,7 +301,12 @@
         <div id="agent-resizer" class="h-resizer"></div>
         <aside id="agent-sidebar"
             class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans shrink-0">
-            <div class="px-4 py-2 flex items-center justify-between border-b border-[var(--sidebar-border)]">
+            <div class="flex-1">
+                <webview src="https://chatgpt.com" class="w-full h-full"
+                    useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36">
+                </webview>
+            </div>
+            <!-- <div class="px-4 py-2 flex items-center justify-between border-b border-[var(--sidebar-border)]">
                 <div class="flex items-center gap-4">
                     <span
                         class="text-[11px] font-bold tracking-wider text-black border-b-2 border-black pb-0.5">CHAT</span>
@@ -360,7 +365,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </div> -->
         </aside>
     </div>
     <footer class="bg-[#f0f0f0] border-t border-gray-300 py-0.5 px-4 text-[11px] flex justify-end gap-10 select-none">
