@@ -901,6 +901,47 @@ ipcRenderer.on('option-zoom-in', () => {
     require('electron').webFrame.setZoomFactor(currentZoom + 0.1);
 });
 
+let savedSidebarState = null;
+
+function getSidebarVisibility() {
+    return {
+        explorer: document.getElementById('explorer-sidebar')?.style.display !== 'none',
+        console: document.getElementById('console-area')?.style.display !== 'none',
+        agent: document.getElementById('agent-sidebar')?.style.display !== 'none'
+    };
+}
+
+ipcRenderer.on('toggle-sidebars', () => {
+    const current = getSidebarVisibility();
+    const anyVisible = current.explorer || current.console || current.agent;
+
+    if (anyVisible) {
+        // Save current state and hide all
+        savedSidebarState = current;
+
+        if (current.explorer) ipcRenderer.emit('toggle-explorer', null, false);
+        if (current.console) ipcRenderer.emit('toggle-console', null, false);
+        if (current.agent) ipcRenderer.emit('toggle-ai-agent', null, false);
+
+        // Sync menu
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', false);
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
+    } else {
+        // Restore previous state
+        const toRestore = savedSidebarState || { explorer: true, console: true, agent: true };
+
+        if (toRestore.explorer) ipcRenderer.emit('toggle-explorer', null, true);
+        if (toRestore.console) ipcRenderer.emit('toggle-console', null, true);
+        if (toRestore.agent) ipcRenderer.emit('toggle-ai-agent', null, true);
+
+        // Sync menu
+        if (toRestore.explorer) ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', true);
+        if (toRestore.console) ipcRenderer.send('update-menu-checkbox', 'menu-view-console', true);
+        if (toRestore.agent) ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', true);
+    }
+});
+
 ipcRenderer.on('toggle-explorer', (event, show) => {
     const el = document.getElementById('explorer-sidebar');
     const resizer = document.getElementById('explorer-resizer');
@@ -929,11 +970,10 @@ ipcRenderer.on('toggle-console', (event, show) => {
         } else {
             el.style.display = 'none';
             if (resizer) resizer.style.display = 'none';
-            // Pop Out: Open windows for active shells
-            consoles.forEach(c => {
-                // Pop Out existing session
-                ipcRenderer.send('pop-out-session', c.id, c.name);
-            });
+            // Only pop out if not in ZEN mode hide (event is null for internal Zen Mode calls)
+            if (event !== null) {
+                consoles.forEach(c => ipcRenderer.send('pop-out-session', c.id, c.name));
+            }
         }
     }
 });
@@ -943,8 +983,6 @@ ipcRenderer.on('edit-goto-line', () => {
     if (line) {
         const lineNum = parseInt(line);
         if (!isNaN(lineNum)) {
-            // contenteditable doesn't have easy line jumping.
-            // We can approximate by scrolling line-number div
             const lineNumbers = document.getElementById('line-numbers');
             const target = lineNumbers.children[lineNum - 1];
             if (target) {
@@ -1877,9 +1915,5 @@ if (closeAgentBtn) {
     });
 }
 
-// Ensure the menu toggle also works as expected (it likely already does via main.js sending toggle-ai-agent)
-ipcRenderer.on('toggle-ai-agent', (event, visible) => {
-    if (agentSidebar) agentSidebar.style.display = visible ? 'flex' : 'none';
-    if (agentResizer) agentResizer.style.display = visible ? 'flex' : 'none';
-});
+// Sidebars are now handled by consolidated listeners above
 

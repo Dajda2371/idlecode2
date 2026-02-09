@@ -227,6 +227,7 @@ function createWindow() {
                     label: 'Explorer',
                     type: 'checkbox',
                     checked: true,
+                    id: 'menu-view-explorer',
                     click: (menuItem) => win.webContents.send('toggle-explorer', menuItem.checked)
                 },
                 {
@@ -242,6 +243,12 @@ function createWindow() {
                     checked: true,
                     id: 'menu-view-agent',
                     click: (menuItem) => win.webContents.send('toggle-ai-agent', menuItem.checked)
+                },
+                { type: 'separator' },
+                {
+                    label: 'Toggle Sidebars',
+                    accelerator: 'CmdOrCtrl+*',
+                    click: () => win.webContents.send('toggle-sidebars')
                 }
             ]
         },
