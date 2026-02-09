@@ -2,5 +2,7 @@ node_modules
 package-lock.json
 build
 
+ElectronWebViewer
+
 .DS_Store
 desktop.ini
