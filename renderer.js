@@ -395,12 +395,11 @@ function renderCode(content) {
 
     lines.forEach((line, index) => {
         // Highlight each line individually.
-        const highlightedLine = hljs.highlight(line, { language: 'python' }).value;
+        // Use <br> for empty lines to maintain height and standard browser behavior
+        const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
         const lineNum = index + 1;
 
-        // Enforce fixed height row
-        // We use explicit styles to override any CSS cascading issues
-        html += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
+        html += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
 
         const numDiv = document.createElement('div');
         numDiv.textContent = lineNum;
@@ -479,13 +478,12 @@ codeContent.oninput = () => {
     const { start, end } = getSelectionOffsets(codeContent);
     const scrollTop = codeContent.scrollTop;
 
-    let text = codeContent.innerText;
-    // innerText adds a trailing newline when block elements (divs) are used.
-    // We must remove exactly one trailing newline to prevent "ghost lines" from growing.
-    if (text.endsWith('\n')) {
-        text = text.slice(0, -1);
+    // Get lines from children to avoid global innerText quirks
+    let currentLines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
+    if (currentLines.length === 0) {
+        const text = codeContent.innerText.replace(/\n$/, '');
+        currentLines = text ? text.split('\n') : [''];
     }
-    const currentLines = text.split('\n');
 
     // Re-highlight everything
     renderLines(currentLines);
@@ -508,9 +506,9 @@ function renderLines(lines) {
     lineNumbers.innerHTML = '';
 
     lines.forEach((line, index) => {
-        // Using empty string if line is empty, height is already enforced via style
+        // Use <br> for empty lines to maintain height and standard browser behavior
         const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
+        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
 
         const numDiv = document.createElement('div');
         numDiv.textContent = index + 1;
@@ -576,9 +574,11 @@ codeContent.onkeydown = (e) => {
     } else if (e.key === 'Enter') {
         e.preventDefault();
 
-        // Simple Auto-indent logic for the editor
+        let text = codeContent.innerText;
+        // Trim standard trailing block newline for accurate caret/line mapping
+        if (text.endsWith('\n')) text = text.slice(0, -1);
+
         const { start } = getSelectionOffsets(codeContent);
-        const text = codeContent.innerText;
         const linesBefore = text.substring(0, start).split('\n');
         const currentLine = linesBefore[linesBefore.length - 1];
 
