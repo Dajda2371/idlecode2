@@ -645,6 +645,29 @@ codeContent.onkeydown = (e) => {
         }
 
         document.execCommand('insertText', false, '\n' + indent);
+
+        // Explicitly move cursor to the new line and scroll into view
+        setTimeout(() => {
+            const newLineIndex = offsets.startLine + 1;
+            const newCol = indent.length;
+
+            // Ensure the new line exists before trying to set cursor
+            if (codeContent.children[newLineIndex]) {
+                try {
+                    setSelectionOffsets(codeContent, {
+                        startLine: newLineIndex,
+                        startCol: newCol,
+                        endLine: newLineIndex,
+                        endCol: newCol
+                    });
+
+                    // Scroll formatting into view
+                    codeContent.children[newLineIndex].scrollIntoView({ block: 'nearest' });
+                } catch (err) {
+                    console.error('Cursor placement failed:', err);
+                }
+            }
+        }, 0);
     } else if (e.key === 'Backspace') {
         const offsets = getSelectionOffsets(codeContent);
 
