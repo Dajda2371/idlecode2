@@ -478,7 +478,13 @@ function setSelectionOffsets(element, start, end) {
 codeContent.oninput = () => {
     const { start, end } = getSelectionOffsets(codeContent);
     const scrollTop = codeContent.scrollTop;
-    const text = codeContent.innerText;
+
+    let text = codeContent.innerText;
+    // innerText adds a trailing newline when block elements (divs) are used.
+    // We must remove exactly one trailing newline to prevent "ghost lines" from growing.
+    if (text.endsWith('\n')) {
+        text = text.slice(0, -1);
+    }
     const currentLines = text.split('\n');
 
     // Re-highlight everything
@@ -504,7 +510,7 @@ function renderLines(lines) {
     lines.forEach((line, index) => {
         // Using empty string if line is empty, height is already enforced via style
         const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
+        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
 
         const numDiv = document.createElement('div');
         numDiv.textContent = index + 1;
@@ -567,6 +573,24 @@ codeContent.onkeydown = (e) => {
     if (e.key === 'Tab') {
         e.preventDefault();
         document.execCommand('insertText', false, '    ');
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+
+        // Simple Auto-indent logic for the editor
+        const { start } = getSelectionOffsets(codeContent);
+        const text = codeContent.innerText;
+        const linesBefore = text.substring(0, start).split('\n');
+        const currentLine = linesBefore[linesBefore.length - 1];
+
+        const match = currentLine.match(/^ */);
+        let indent = match ? match[0] : '';
+
+        // If line ends with colon, increase indent
+        if (currentLine.trim().endsWith(':')) {
+            indent += '    ';
+        }
+
+        document.execCommand('insertText', false, '\n' + indent);
     }
 };
 
