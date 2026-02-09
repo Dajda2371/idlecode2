@@ -439,17 +439,30 @@ function getSelectionOffsets(element) {
 
     const getPos = (container, offset) => {
         let node = container;
+
+        // If container is the element itself, we're between divs or at start/end
+        if (node === element) {
+            // offset tells us which child div we're at
+            const lineIndex = Math.min(offset, element.children.length - 1);
+            return { line: Math.max(0, lineIndex), col: 0 };
+        }
+
         // Find the line div (direct child of element)
         while (node && node.parentNode !== element && node !== element) {
             node = node.parentNode;
         }
 
         const lineIndex = Array.from(element.children).indexOf(node);
-        const line = lineIndex !== -1 ? lineIndex : 0;
+
+        // If lineIndex is still -1, something went wrong - default to last line
+        const line = lineIndex !== -1 ? lineIndex : Math.max(0, element.children.length - 1);
 
         // Calculate column within that line div
+        const lineDiv = element.children[line];
+        if (!lineDiv) return { line: 0, col: 0 };
+
         const preCaretRange = document.createRange();
-        preCaretRange.selectNodeContents(node || element.children[line] || element);
+        preCaretRange.selectNodeContents(lineDiv);
         preCaretRange.setEnd(container, offset);
         const col = preCaretRange.toString().length;
 
@@ -629,6 +642,7 @@ codeContent.onkeydown = (e) => {
         if (textBeforeCaret.trim().endsWith(':')) {
             indent += '    ';
         }
+
 
         document.execCommand('insertText', false, '\n' + indent);
     }
