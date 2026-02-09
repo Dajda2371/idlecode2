@@ -307,7 +307,8 @@
         <aside id="agent-sidebar"
             class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans shrink-0">
             <div class="flex-1">
-                <webview src="https://chatgpt.com" class="w-full h-full" partition="persist:agent-session" allowpopups
+                <webview id="chatgpt-webview" src="https://chatgpt.com" class="w-full h-full"
+                    partition="persist:agent-session" allowpopups
                     useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36">
                 </webview>
             </div>

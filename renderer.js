@@ -1838,3 +1838,28 @@ setupResizer('explorer-resizer', 'explorer-sidebar', 'h');
 setupResizer('agent-resizer', 'agent-sidebar', 'h', true);
 setupResizer('console-v-resizer', 'console-area', 'v', true);
 setupResizer('shell-sessions-resizer', 'shell-sessions-sidebar', 'h', true);
+
+// Enforce Light Mode for Agent Webview
+const chatWebview = document.getElementById('chatgpt-webview');
+if (chatWebview) {
+    chatWebview.addEventListener('dom-ready', () => {
+        // 1. Force light color scheme preference
+        chatWebview.insertCSS(`
+            :root, body, html {
+                color-scheme: light !important;
+            }
+        `);
+        // 2. Force ChatGPT's specific classes and theme setting
+        chatWebview.executeJavaScript(`
+            try {
+                localStorage.setItem('theme', 'light');
+                document.documentElement.classList.remove('dark');
+                document.documentElement.classList.add('light');
+                document.documentElement.style.colorScheme = 'light';
+            } catch (e) {
+                console.error('Failed to force light mode:', e);
+            }
+        `);
+    });
+}
+
