@@ -637,6 +637,7 @@ ipcRenderer.on('toggle-console', (event, show) => {
             // and "pop in" as hiding remote and showing local...
             // We can perhaps just close the remote windows.
             ipcRenderer.send('close-popped-consoles');
+            setTimeout(() => consoleInput.focus(), 50);
         } else {
             el.style.display = 'none';
             if (resizer) resizer.style.display = 'none';
@@ -645,6 +646,15 @@ ipcRenderer.on('toggle-console', (event, show) => {
         }
     }
 });
+
+if (consoleOutput) {
+    consoleOutput.addEventListener('click', () => {
+        const selection = window.getSelection();
+        if (selection.toString().length === 0) {
+            consoleInput.focus();
+        }
+    });
+}
 
 ipcRenderer.on('edit-goto-line', () => {
     if (!editor) return;

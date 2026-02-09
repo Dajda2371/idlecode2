@@ -330,4 +330,11 @@ consoleInput.addEventListener('keydown', (e) => {
     }
 });
 
+consoleOutput.addEventListener('click', () => {
+    const selection = window.getSelection();
+    if (selection.toString().length === 0) {
+        consoleInput.focus();
+    }
+});
+
 consoleInput.focus();
