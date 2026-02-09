@@ -564,6 +564,50 @@ ipcRenderer.on('toggle-ai-agent', (event, show) => {
     }
 });
 
+ipcRenderer.on('toggle-explorer', (event, show) => {
+    const el = document.getElementById('explorer-sidebar');
+    const resizer = document.getElementById('explorer-resizer');
+
+    if (el) el.style.display = show ? 'flex' : 'none';
+    if (resizer) resizer.style.display = show ? 'block' : 'none';
+
+    // Update saved state
+    if (typeof savedSidebarState !== 'undefined') {
+        savedSidebarState.explorer = show;
+    }
+
+    // Layout update
+    if (window.monaco && window.monaco.editor) {
+        setTimeout(() => window.monaco.editor.getEditors().forEach(e => e.layout()), 50);
+    }
+});
+
+ipcRenderer.on('toggle-console', (event, show) => {
+    const consoleArea = document.getElementById('console-area');
+    const consoleResizer = document.getElementById('console-v-resizer');
+
+    if (consoleArea) {
+        consoleArea.style.display = show ? 'flex' : 'none';
+        if (show) {
+            // Reset layout to safe defaults
+            consoleArea.classList.remove('flex-1');
+            consoleArea.classList.add('h-[250px]');
+            consoleArea.style.height = '';
+        }
+    }
+    if (consoleResizer) consoleResizer.style.display = show ? 'block' : 'none';
+
+    // Update saved state
+    if (typeof savedSidebarState !== 'undefined') {
+        savedSidebarState.console = show;
+    }
+
+    // Layout
+    if (window.monaco && window.monaco.editor) {
+        setTimeout(() => window.monaco.editor.getEditors().forEach(e => e.layout()), 50);
+    }
+});
+
 // Toggle Sidebars Logic
 let savedSidebarState = { explorer: true, agent: true, console: true };
 
