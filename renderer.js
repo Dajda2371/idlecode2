@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await monacoBridge.init();
         console.log('Monaco Editor ready');
+
+        // Initial Layout: Console Only
+        initializeLayout();
     } catch (error) {
         console.error('Failed to initialize Monaco Editor:', error);
         alert('Failed to initialize editor. Please restart the application.');
@@ -21,7 +24,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // IPC Listeners
 ipcRenderer.on('open-file', (event, filePath) => {
+    switchToEditorView();
     openFile(filePath);
+});
+
+ipcRenderer.on('new-file', () => {
+    switchToEditorView();
+    createNewFile();
 });
 
 
@@ -30,6 +39,91 @@ ipcRenderer.on('open-folder', (event, folderPath) => {
     document.title = path.basename(folderPath);
     loadDirectory(PROJECT_ROOT, treeContainer);
 });
+
+// View Transitions
+function initializeLayout() {
+    // Hide Sidebars
+    const explorer = document.getElementById('explorer-sidebar');
+    const explorerResizer = document.getElementById('explorer-resizer');
+    const agent = document.getElementById('agent-sidebar');
+    const agentResizer = document.getElementById('agent-resizer');
+
+    if (explorer) explorer.style.display = 'none';
+    if (explorerResizer) explorerResizer.style.display = 'none';
+    if (agent) agent.style.display = 'none';
+    if (agentResizer) agentResizer.style.display = 'none';
+
+    // Hide Editor Area
+    const editorArea = document.getElementById('editor-area'); // Defines the flex-1 area for editor
+    // Note: 'editor-area' contains 'monaco-editor-container' and modals.
+    // If we hide it, we hide modals too?
+    // Modals are usually children of editor-area in this HTML structure (Step 243).
+    // Yes, modals are inside.
+    // But settings modal is global? 
+    // Step 243: settings-modal is inside editor-area.
+    // If we hide editor-area, settings dialog won't show.
+    // Ideally we just hide 'monaco-editor-container'. 
+    // But 'editor-area' takes up the space. 
+    // If we hide 'monaco-editor-container', editor-area is empty but still flex-1?
+    // Let's hide 'editor-area' but verify modal usage.
+    // If user opens settings at startup, it won't show.
+    // But standard usage is File -> Open first.
+    // I'll proceed with hiding 'editor-area'.
+    if (editorArea) editorArea.style.display = 'none';
+
+    // Maximize Console
+    const consoleArea = document.getElementById('console-area');
+    const consoleResizer = document.getElementById('console-v-resizer');
+
+    if (consoleArea) {
+        consoleArea.classList.remove('h-[250px]'); // Remove fixed height
+        consoleArea.classList.add('flex-1');      // Make it fill space
+        consoleArea.style.display = 'flex';
+    }
+    if (consoleResizer) consoleResizer.style.display = 'none';
+
+    // Update Menu Checkboxes
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', false);
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-console', true);
+
+    // Update saved state for toggling
+    if (typeof savedSidebarState !== 'undefined') {
+        savedSidebarState = { explorer: false, agent: false, console: true };
+    }
+}
+
+function switchToEditorView() {
+    // Show Editor
+    const editorArea = document.getElementById('editor-area');
+    if (editorArea) {
+        editorArea.style.display = 'flex'; // Restore flex
+    }
+
+    // Restore Console
+    const consoleArea = document.getElementById('console-area');
+    const consoleResizer = document.getElementById('console-v-resizer');
+
+    if (consoleArea) {
+        consoleArea.classList.remove('flex-1');
+        consoleArea.classList.add('h-[250px]');
+    }
+    if (consoleResizer) consoleResizer.style.display = 'block';
+
+    // Trigger resize
+    if (window.monaco && window.monaco.editor) {
+        setTimeout(() => window.monaco.editor.getEditors().forEach(e => e.layout()), 50);
+    }
+}
+
+function createNewFile() {
+    currentFilePath = null;
+    document.title = 'Untitled';
+    if (window.monaco && window.monaco.editor) {
+        const editor = window.monaco.editor.getEditors()[0];
+        if (editor) editor.setValue('');
+    }
+}
 
 
 // Configuration
