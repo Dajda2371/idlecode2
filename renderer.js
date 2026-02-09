@@ -38,6 +38,43 @@ ipcRenderer.on('open-folder', (event, folderPath) => {
     PROJECT_ROOT = folderPath;
     document.title = path.basename(folderPath);
     loadDirectory(PROJECT_ROOT, treeContainer);
+
+    // Switch to Editor View
+    switchToEditorView();
+
+    // Enforce Explorer Visible, Console/Agent Hidden
+    const explorer = document.getElementById('explorer-sidebar');
+    const explorerResizer = document.getElementById('explorer-resizer');
+    const agent = document.getElementById('agent-sidebar');
+    const agentResizer = document.getElementById('agent-resizer');
+    const consoleArea = document.getElementById('console-area');
+    const consoleResizer = document.getElementById('console-v-resizer');
+
+    if (explorer) explorer.style.display = 'flex';
+    if (explorerResizer) explorerResizer.style.display = 'block';
+
+    if (agent) agent.style.display = 'none';
+    if (agentResizer) agentResizer.style.display = 'none';
+
+    if (consoleArea) {
+        consoleArea.style.display = 'none';
+        consoleArea.classList.remove('flex-1');
+        consoleArea.classList.add('h-[250px]');
+        consoleArea.style.height = ''; // Reset custom height
+    }
+    if (consoleResizer) consoleResizer.style.display = 'none';
+
+    // Update Menu Checkboxes
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', true);
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
+
+    savedSidebarState = { explorer: true, agent: false, console: false };
+
+    // Trigger Layout
+    if (window.monaco && window.monaco.editor) {
+        setTimeout(() => window.monaco.editor.getEditors().forEach(e => e.layout()), 50);
+    }
 });
 
 // View Transitions
@@ -90,9 +127,17 @@ function switchToEditorView() {
         editorArea.style.display = 'flex';
     }
 
-    // Restore Console to bottom panel if needed? 
-    // User requested popped out shell. So we keep local console hidden.
-    // If user wants it back, they can use Toggle Sidebars or View Console.
+    // Ensure Console is Hidden and Reset (User wants popped out shell by default)
+    const consoleArea = document.getElementById('console-area');
+    const consoleResizer = document.getElementById('console-v-resizer');
+
+    if (consoleArea) {
+        consoleArea.style.display = 'none';
+        consoleArea.classList.remove('flex-1');
+        consoleArea.classList.add('h-[250px]');
+        consoleArea.style.height = ''; // Reset custom height
+    }
+    if (consoleResizer) consoleResizer.style.display = 'none';
 
     // Trigger resize
     if (window.monaco && window.monaco.editor) {
