@@ -631,20 +631,17 @@ ipcRenderer.on('run-module', () => {
         fs.writeFileSync(currentFilePath, content);
 
         const consoleArea = document.getElementById('console-area');
+        const isConsoleVisible = consoleArea && consoleArea.style.display !== 'none';
 
         // Always use the managed process via runPythonMetadata
         const consoleData = runPythonMetadata(currentFilePath);
 
-        // POP BACK IN logic:
-        // When running a module, we want the shell to be visible in the main window (IDLE behavior)
-        if (consoleArea) {
-            if (consoleArea.style.display === 'none') {
-                consoleArea.style.display = 'flex';
-                // Sync menu state
-                ipcRenderer.send('update-menu-checkbox', 'menu-view-console', true);
-            }
-            // Close any popped out windows to bring the session back to the main window
-            ipcRenderer.send('close-popped-consoles');
+        if (isConsoleVisible) {
+            // Ensure console is focused/shown in main window
+            consoleArea.style.display = 'flex';
+        } else {
+            // Pop out OR focus existing pop-out window
+            ipcRenderer.send('pop-out-session', consoleData.id, consoleData.name);
         }
     } else {
         alert('Please save the file before running.');
