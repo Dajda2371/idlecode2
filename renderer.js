@@ -51,11 +51,37 @@ let monacoInstance; // To store the monaco global if needed
 
 // Initialize Monaco
 amdRequire(['vs/editor/editor.main'], function () {
+    // Define custom IDLE theme
+    monaco.editor.defineTheme('idle-classic', {
+        base: 'vs', // Light base
+        inherit: true, // Inherit other defaults
+        rules: [
+            { token: 'keyword', foreground: 'ff7b00' },       // --idle-keyword
+            { token: 'type', foreground: '900090' },          // --idle-builtin (classes/types)
+            { token: 'predefined', foreground: '900090' },    // --idle-builtin (if applicable)
+            { token: 'string', foreground: '00aa00' },        // --idle-string
+            { token: 'string.escape', foreground: '00aa00' }, // --idle-string
+            { token: 'comment', foreground: 'dd0000' },       // --idle-comment
+            { token: 'number', foreground: '000000' },        // --idle-text (IDLE uses black for numbers)
+            { token: 'delimiter', foreground: '000000' },     // --idle-text
+            { token: 'operator', foreground: '000000' },      // --idle-text
+            { token: '', foreground: '000000', background: 'ffffff' } // --idle-text, --idle-bg
+        ],
+        colors: {
+            'editor.background': '#ffffff',               // --idle-bg
+            'editor.foreground': '#000000',               // --idle-text
+            'editorCursor.foreground': '#000000',
+            'editor.lineHighlightBackground': '#eeeeee',  // Subtle highlight
+            'editorLineNumber.foreground': '#aaaaaa',
+            'editor.selectionBackground': '#b5d5ff'       // Standard selection
+        }
+    });
+
     monacoInstance = monaco;
     editor = monaco.editor.create(document.getElementById('monaco-container'), {
         value: '# Welcome to IDLE Code 2\n# Start coding!\n\nprint("Hello World")',
         language: 'python',
-        theme: 'vs-light',
+        theme: 'idle-classic',
         fontSize: 13,
         fontFamily: "'Courier New', Courier, monospace",
         automaticLayout: true,
