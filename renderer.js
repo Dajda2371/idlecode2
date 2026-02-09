@@ -1,9 +1,24 @@
 const fs = require('fs');
 const path = require('path');
 const { ipcRenderer } = require('electron');
-const { spawn } = require('child_process'); // Added spawn
-const hljs = require('highlight.js/lib/core');
-hljs.registerLanguage('python', require('highlight.js/lib/languages/python'));
+const { spawn } = require('child_process');
+
+// Monaco Editor Loader
+const amdLoader = require('./node_modules/monaco-editor/min/vs/loader.js');
+const amdRequire = amdLoader.require;
+const amdDefine = amdLoader.require.define;
+
+function uriFromPath(_path) {
+    var pathName = path.resolve(_path).replace(/\\/g, '/');
+    if (pathName.length > 0 && pathName.charAt(0) !== '/') {
+        pathName = '/' + pathName;
+    }
+    return encodeURI('file://' + pathName);
+}
+
+amdRequire.config({
+    baseUrl: uriFromPath(path.join(__dirname, './node_modules/monaco-editor/min'))
+});
 
 // IPC Listeners
 ipcRenderer.on('open-file', (event, filePath) => {
@@ -28,9 +43,37 @@ const ICONS = {
 };
 
 const treeContainer = document.getElementById('file-tree');
-const codeContent = document.getElementById('code-content');
-const lineNumbers = document.getElementById('line-numbers');
 const contextMenu = document.getElementById('file-context-menu');
+
+// Monaco Editor Instance
+let editor;
+let monacoInstance; // To store the monaco global if needed
+
+// Initialize Monaco
+amdRequire(['vs/editor/editor.main'], function () {
+    monacoInstance = monaco;
+    editor = monaco.editor.create(document.getElementById('monaco-container'), {
+        value: '# Welcome to IDLE Code 2\n# Start coding!\n\nprint("Hello World")',
+        language: 'python',
+        theme: 'vs-light',
+        fontSize: 13,
+        fontFamily: "'Courier New', Courier, monospace",
+        automaticLayout: true,
+        minimap: { enabled: true },
+        scrollBeyondLastLine: false,
+        renderLineHighlight: 'all',
+        scrollbar: {
+            vertical: 'visible',
+            horizontal: 'visible'
+        }
+    });
+
+    // Autosave Hook
+    editor.onDidChangeModelContent(() => {
+        debouncedSave();
+    });
+});
+
 
 // Context Menu State
 let ctxTarget = null;
@@ -350,346 +393,32 @@ function deleteItem() {
 }
 
 
+
 function openFile(filePath) {
     fs.readFile(filePath, 'utf-8', (err, data) => {
         if (err) return console.error(err);
         currentFilePath = filePath;
         document.title = `${path.basename(filePath)} - ${filePath}`;
-        renderCode(data);
+
+        if (editor) {
+            editor.setValue(data);
+            // Detect language
+            const ext = path.extname(filePath).toLowerCase();
+            const lang = ext === '.py' ? 'python' :
+                ext === '.js' ? 'javascript' :
+                    ext === '.html' ? 'html' :
+                        ext === '.css' ? 'css' :
+                            ext === '.json' ? 'json' : 'plaintext';
+            monaco.editor.setModelLanguage(editor.getModel(), lang);
+        }
     });
 }
-
 
 // Current open file path
 let currentFilePath = null;
 
-function renderCode(content) {
-    const lines = content.split('\n');
-    const lineNumbers = document.getElementById('line-numbers');
-    const codeContent = document.getElementById('code-content');
+// Deleted old renderCode, getSelectionOffsets, setSelectionOffsets, updateCaretPosition, event listeners
 
-    if (!lineNumbers || !codeContent) return;
-
-    // Enable editing
-    codeContent.contentEditable = true;
-    codeContent.spellcheck = false;
-    codeContent.style.outline = 'none';
-
-    lineNumbers.innerHTML = '';
-    codeContent.innerHTML = '';
-
-    // We use innerHTML to support syntax highlighting.
-
-
-    // Use highlight.js
-    const highlightedCode = hljs.highlight(content, { language: 'python' }).value;
-
-    // Split highlighted code into lines. 
-    // HLJS might produce HTML that spans lines. This is the tricky part.
-    // If we use separate containers for line numbers, alignment fails as seen.
-    // So we MUST use a row-based layout: <div class="line"><div class="num">1</div><div class="code">...</div></div>
-    // BUT HLJS output is a single HTML block.
-    // To solve this robustly without a complex parser:
-    // 1. We keep the separate containers but force them to be single lines with NO WRAPPING.
-    // 2. We set explicit height in pixels for every line.
-
-    // Let's try explicit line styling first. 
-    // The previous attempt failed because contenteditable puts text in text nodes or divs, and highlight.js puts spans. 
-    // Spans can affect line height if font-size fallback happens or if there are inline-blocks.
-
-    codeContent.innerHTML = '';
-
-    // Use highlight.js
-    // We will highlight line-by-line to ensure perfect alignment with line numbers.
-    let html = '';
-
-    lineNumbers.innerHTML = ''; // Clear existing line numbers
-
-    lines.forEach((line, index) => {
-        // Highlight each line individually.
-        // Use <br> for empty lines to maintain height and standard browser behavior
-        const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-        const lineNum = index + 1;
-
-        html += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
-
-        const numDiv = document.createElement('div');
-        numDiv.textContent = lineNum;
-        numDiv.className = 'h-[20px] leading-[20px]';
-        numDiv.style.height = '20px';
-        numDiv.style.lineHeight = '20px';
-        lineNumbers.appendChild(numDiv);
-    });
-
-    codeContent.innerHTML = html;
-
-    // Scroll Sync
-    codeContent.onscroll = () => {
-        lineNumbers.scrollTop = codeContent.scrollTop;
-    };
-
-    initHistory(content);
-}
-
-// Helper to get selection as {line, col} for start and end
-function getSelectionOffsets(element) {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return { startLine: 0, startCol: 0, endLine: 0, endCol: 0 };
-    const range = selection.getRangeAt(0);
-
-    const getPos = (container, offset) => {
-        let node = container;
-
-        // If container is the element itself, we're between divs or at start/end
-        if (node === element) {
-            // offset tells us which child div we're at
-            const lineIndex = Math.min(offset, element.children.length - 1);
-            return { line: Math.max(0, lineIndex), col: 0 };
-        }
-
-        // Find the line div (direct child of element)
-        while (node && node.parentNode !== element && node !== element) {
-            node = node.parentNode;
-        }
-
-        const lineIndex = Array.from(element.children).indexOf(node);
-
-        // If lineIndex is still -1, something went wrong - default to last line
-        const line = lineIndex !== -1 ? lineIndex : Math.max(0, element.children.length - 1);
-
-        // Calculate column within that line div
-        const lineDiv = element.children[line];
-        if (!lineDiv) return { line: 0, col: 0 };
-
-        const preCaretRange = document.createRange();
-        preCaretRange.selectNodeContents(lineDiv);
-        preCaretRange.setEnd(container, offset);
-        const col = preCaretRange.toString().length;
-
-        return { line, col };
-    };
-
-    const start = getPos(range.startContainer, range.startOffset);
-    const end = getPos(range.endContainer, range.endOffset);
-
-    return {
-        startLine: start.line, startCol: start.col,
-        endLine: end.line, endCol: end.col
-    };
-}
-
-// Helper to set selection from {line, col} coordinates
-function setSelectionOffsets(element, offsets) {
-    const { startLine, startCol, endLine, endCol } = offsets;
-    const selection = window.getSelection();
-    const range = document.createRange();
-
-    const setPos = (targetRange, isStart, line, col) => {
-        const row = element.children[line] || element.lastElementChild;
-        if (!row) return;
-
-        let charCount = 0;
-        const nodeStack = [row];
-        let node;
-        let set = false;
-
-        while ((node = nodeStack.pop())) {
-            if (node.nodeType === 3) {
-                const nextCharCount = charCount + node.length;
-                if (col >= charCount && col <= nextCharCount) {
-                    if (isStart) targetRange.setStart(node, col - charCount);
-                    else targetRange.setEnd(node, col - charCount);
-                    set = true;
-                    break;
-                }
-                charCount = nextCharCount;
-            } else {
-                for (let i = node.childNodes.length - 1; i >= 0; i--) {
-                    nodeStack.push(node.childNodes[i]);
-                }
-            }
-        }
-
-        if (!set) {
-            // Fallback to end of last node in row
-            const lastNode = row.lastChild || row;
-            const offset = (lastNode.nodeType === 3) ? lastNode.length : row.childNodes.length;
-            if (isStart) targetRange.setStart(lastNode, offset);
-            else targetRange.setEnd(lastNode, offset);
-        }
-    };
-
-    try {
-        setPos(range, true, startLine, startCol);
-        setPos(range, false, endLine, endCol);
-        selection.removeAllRanges();
-        selection.addRange(range);
-    } catch (e) {
-        console.error("Failed to set selection:", e);
-    }
-}
-
-// Real-time highlighting and line number sync
-codeContent.oninput = () => {
-    const offsets = getSelectionOffsets(codeContent);
-    const scrollTop = codeContent.scrollTop;
-
-    // Get lines from children to avoid global innerText quirks
-    // We flatMap and split by \n to ensure each line gets its own div
-    let currentLines = Array.from(codeContent.children).flatMap(div => div.innerText.replace(/\n$/, '').split('\n'));
-    if (currentLines.length === 0) {
-        let text = codeContent.innerText;
-        if (text.endsWith('\n')) text = text.slice(0, -1);
-        currentLines = text ? text.split('\n') : [''];
-    }
-
-    // Re-highlight everything
-    renderLines(currentLines);
-
-    codeContent.scrollTop = scrollTop;
-    setSelectionOffsets(codeContent, offsets);
-
-    // Ensure scroll sync is maintained
-    lineNumbers.scrollTop = codeContent.scrollTop;
-
-    // History management
-    scheduleHistorySave();
-
-    // Autosave
-    debouncedSave();
-};
-
-function renderLines(lines) {
-    let newHtml = '';
-    lineNumbers.innerHTML = '';
-
-    lines.forEach((line, index) => {
-        // Use <br> for empty lines to maintain height and standard browser behavior
-        const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
-
-        const numDiv = document.createElement('div');
-        numDiv.textContent = index + 1;
-        numDiv.style.height = '20px';
-        numDiv.style.lineHeight = '20px';
-        numDiv.className = 'h-[20px] leading-[20px]';
-        lineNumbers.appendChild(numDiv);
-    });
-
-    codeContent.innerHTML = newHtml;
-}
-const updateCaretPosition = () => {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-
-    // Find the line div (direct child of codeContent)
-    let container = range.startContainer;
-    if (container === codeContent) {
-        // Caret might be between divs
-        container = codeContent.childNodes[range.startOffset] || codeContent.lastChild;
-    }
-
-    while (container && container.parentNode !== codeContent && container !== codeContent) {
-        container = container.parentNode;
-    }
-
-    if (!container || container === codeContent) {
-        const offsets = getSelectionOffsets(codeContent);
-        document.getElementById('footer-ln').textContent = `Ln: ${offsets.startLine + 1}`;
-        document.getElementById('footer-col').textContent = `Col: ${offsets.startCol}`;
-        return;
-    }
-
-    const ln = Array.from(codeContent.children).indexOf(container) + 1;
-
-    // Column logic: offset within this specific div
-    const preCaretRange = range.cloneRange();
-    preCaretRange.selectNodeContents(container);
-    preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-    // Use textContent or toString() but be careful with <br>
-    const col = preCaretRange.toString().length;
-
-    const lnDiv = document.getElementById('footer-ln');
-    const colDiv = document.getElementById('footer-col');
-    if (lnDiv) lnDiv.textContent = `Ln: ${ln > 0 ? ln : 1}`;
-    if (colDiv) colDiv.textContent = `Col: ${col}`;
-};
-
-document.addEventListener('selectionchange', () => {
-    if (document.activeElement === codeContent) {
-        updateCaretPosition();
-    }
-});
-
-codeContent.onkeydown = (e) => {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        document.execCommand('insertText', false, '    ');
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-
-        const offsets = getSelectionOffsets(codeContent);
-        const currentLineDiv = codeContent.children[offsets.startLine];
-        const lineText = currentLineDiv ? currentLineDiv.innerText.replace(/\n$/, '') : '';
-        const textBeforeCaret = lineText.substring(0, offsets.startCol);
-
-        const match = textBeforeCaret.match(/^ */);
-        let indent = match ? match[0] : '';
-
-
-        // If part of line before caret ends with colon, increase indent
-        if (textBeforeCaret.trim().endsWith(':')) {
-            indent += '    ';
-        }
-
-        document.execCommand('insertText', false, '\n' + indent);
-
-        // Explicitly move cursor to the new line and scroll into view
-        setTimeout(() => {
-            const newLineIndex = offsets.startLine + 1;
-            const newCol = indent.length;
-
-            // Ensure the new line exists before trying to set cursor
-            if (codeContent.children[newLineIndex]) {
-                try {
-                    setSelectionOffsets(codeContent, {
-                        startLine: newLineIndex,
-                        startCol: newCol,
-                        endLine: newLineIndex,
-                        endCol: newCol
-                    });
-
-                    // Scroll formatting into view
-                    codeContent.children[newLineIndex].scrollIntoView({ block: 'nearest' });
-                } catch (err) {
-                    console.error('Cursor placement failed:', err);
-                }
-            }
-        }, 0);
-    } else if (e.key === 'Backspace') {
-        const offsets = getSelectionOffsets(codeContent);
-
-        if (offsets.startCol === 0 && offsets.startLine > 0 && offsets.startLine === offsets.endLine) {
-            e.preventDefault();
-
-            const prevLine = codeContent.children[offsets.startLine - 1];
-            const currentLine = codeContent.children[offsets.startLine];
-
-            if (prevLine && currentLine) {
-                const currentHTML = currentLine.innerHTML;
-                prevLine.innerHTML += currentHTML;
-                currentLine.remove();
-            }
-        }
-    }
-};
-
-
-function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
 
 function saveFile(silent = false) {
     if (currentFilePath) {
@@ -762,192 +491,43 @@ function saveHistoryState() {
     lastState = { text, offsets };
 }
 
+// --- Menu Action Listeners ---
+
 ipcRenderer.on('edit-undo', () => {
-    if (undoStack.length === 0) return;
-
-    const currentState = { text: codeContent.innerText, offsets: getSelectionOffsets(codeContent) };
-    redoStack.push(currentState);
-
-    const state = undoStack.pop();
-    lastState = state;
-    applyHistoryState(state);
+    if (editor) editor.trigger('menu', 'undo');
 });
 
 ipcRenderer.on('edit-redo', () => {
-    if (redoStack.length === 0) return;
-
-    const currentState = { text: codeContent.innerText, offsets: getSelectionOffsets(codeContent) };
-    undoStack.push(currentState);
-
-    const state = redoStack.pop();
-    lastState = state;
-    applyHistoryState(state);
+    if (editor) editor.trigger('menu', 'redo');
 });
-
-function applyHistoryState(state) {
-    const lines = state.text.split('\n');
-    if (lines[lines.length - 1] === '' && state.text.length > 0) lines.pop(); // Fix trailing newline from innerText
-    renderLines(lines);
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, state.offsets);
-    }, 0);
-    debouncedSave();
-}
-
-
-// --- Menu Action Listeners ---
 
 // Format Menu
 ipcRenderer.on('format-indent', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            return '    ' + line;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol += 4;
-    offsets.endCol += 4;
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.indentLines');
 });
 
 ipcRenderer.on('format-dedent', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    let startRemoved = 0;
-    let endRemoved = 0;
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            let removed = 0;
-            let newLine = line;
-            if (line.startsWith('    ')) {
-                removed = 4;
-                newLine = line.substring(4);
-            } else if (line.startsWith('\t')) {
-                removed = 1;
-                newLine = line.substring(1);
-            } else {
-                const match = line.match(/^ +/);
-                if (match) {
-                    removed = Math.min(match[0].length, 4);
-                    newLine = line.substring(removed);
-                }
-            }
-            if (idx === offsets.startLine) startRemoved = removed;
-            if (idx === offsets.endLine) endRemoved = removed;
-            return newLine;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol = Math.max(0, offsets.startCol - startRemoved);
-    offsets.endCol = Math.max(0, offsets.endCol - endRemoved);
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.outdentLines');
 });
 
 ipcRenderer.on('format-comment', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            return '##' + line;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol += 2;
-    offsets.endCol += 2;
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.addCommentLine');
 });
 
 ipcRenderer.on('format-uncomment', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    let startRemoved = 0;
-    let endRemoved = 0;
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            let removed = 0;
-            let newLine = line;
-            if (line.startsWith('##')) {
-                removed = 2;
-                newLine = line.substring(2);
-            } else if (line.startsWith('# ')) {
-                removed = 2;
-                newLine = line.substring(2);
-            } else if (line.startsWith('#')) {
-                removed = 1;
-                newLine = line.substring(1);
-            }
-            if (idx === offsets.startLine) startRemoved = removed;
-            if (idx === offsets.endLine) endRemoved = removed;
-            return newLine;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol = Math.max(0, offsets.startCol - startRemoved);
-    offsets.endCol = Math.max(0, offsets.endCol - endRemoved);
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.removeCommentLine');
 });
 
 ipcRenderer.on('format-tabify', () => {
-    saveHistoryState();
-    const content = codeContent.innerText;
-    const newContent = content.replace(/    /g, '\t');
-    renderLines(newContent.split('\n'));
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.indentationToTabs');
 });
 
 ipcRenderer.on('format-untabify', () => {
-    saveHistoryState();
-    const content = codeContent.innerText;
-    const newContent = content.replace(/\t/g, '    ');
-    renderLines(newContent.split('\n'));
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.indentationToSpaces');
 });
 
 ipcRenderer.on('format-strip-trailing', () => {
-    saveHistoryState();
-    const content = codeContent.innerText;
-    const newContent = content.split('\n').map(line => line.trimEnd()).join('\n');
-    renderLines(newContent.split('\n'));
-    saveHistoryState();
-    debouncedSave();
+    if (editor) editor.trigger('menu', 'editor.action.trimTrailingWhitespace');
 });
 
 
@@ -1041,17 +621,9 @@ ipcRenderer.on('toggle-console', (event, show) => {
 });
 
 ipcRenderer.on('edit-goto-line', () => {
-    const line = prompt('Go to line number:');
-    if (line) {
-        const lineNum = parseInt(line);
-        if (!isNaN(lineNum)) {
-            const lineNumbers = document.getElementById('line-numbers');
-            const target = lineNumbers.children[lineNum - 1];
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-    }
+    if (!editor) return;
+    editor.focus();
+    editor.trigger('menu', 'editor.action.gotoLine');
 });
 
 
@@ -1075,8 +647,8 @@ ipcRenderer.on('toggle-ai-agent', (event, show) => {
 
 ipcRenderer.on('run-module', () => {
     // Save first
-    if (currentFilePath) {
-        const content = document.getElementById('code-content').innerText;
+    if (editor && currentFilePath) {
+        const content = editor.getValue();
         fs.writeFileSync(currentFilePath, content);
 
         const consoleArea = document.getElementById('console-area');
