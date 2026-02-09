@@ -86,6 +86,39 @@ class MonacoEditorManager {
 
             console.log('Monaco modules loaded.');
 
+            // Define IDLE Theme
+            // Colors from index.html CSS variables
+            // --idle-bg: #ffffff
+            // --idle-keyword: #ff7b00
+            // --idle-string: #00aa00
+            // --idle-comment: #dd0000
+            // --idle-builtin: #900090
+            // --idle-text: #000000
+
+            // Ensure monaco global is available
+            const monaco = window.monaco || global.monaco;
+            if (monaco) {
+                monaco.editor.defineTheme('idle-theme', {
+                    base: 'vs',
+                    inherit: true,
+                    rules: [
+                        { token: 'keyword', foreground: 'ff7b00' },
+                        { token: 'string', foreground: '00aa00' },
+                        { token: 'comment', foreground: 'dd0000' },
+                        { token: 'type', foreground: '900090' },
+                        { token: 'predefined', foreground: '900090' },
+                        { token: 'identifier', foreground: '000000' },
+                    ],
+                    colors: {
+                        'editor.background': '#ffffff',
+                        'editor.foreground': '#000000',
+                        'editorLineNumber.foreground': '#000000',
+                        'editor.selectionBackground': '#B5D5FF',
+                        'editor.inactiveSelectionBackground': '#D4D4D4'
+                    }
+                });
+            }
+
             // Create Editor
             this._createEditor(container);
 
@@ -107,7 +140,7 @@ class MonacoEditorManager {
         this.editor = monaco.editor.create(container, {
             value: '# Welcome to Monaco Editor!\n# Open a file from the file tree to start editing.',
             language: 'python',
-            theme: 'vs', // Standard light theme
+            theme: 'idle-theme', // IDLE Theme
             fontSize: 13,
             fontFamily: "'Courier New', Courier, monospace",
             lineNumbers: 'on',
