@@ -233,7 +233,7 @@ function createItemUI(isFolder) {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'text-[13px] border border-blue-400 px-1 py-0.5 w-full outline-none';
-    input.value = isFolder ? 'New Folder' : 'new_file.py';
+    input.value = ''; // Start with empty input
 
     inputContainer.appendChild(icon);
     inputContainer.appendChild(input);
@@ -249,7 +249,12 @@ function createItemUI(isFolder) {
     input.focus();
     input.select();
 
+    let committed = false; // Flag to prevent double-removal
+
     const commitCreation = () => {
+        if (committed) return; // Already committed
+        committed = true;
+
         const name = input.value.trim();
         if (!name) {
             inputContainer.remove();
@@ -275,7 +280,10 @@ function createItemUI(isFolder) {
 
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') commitCreation();
-        if (e.key === 'Escape') inputContainer.remove();
+        if (e.key === 'Escape') {
+            committed = true; // Mark as handled
+            inputContainer.remove();
+        }
     });
 
     input.addEventListener('blur', () => {
