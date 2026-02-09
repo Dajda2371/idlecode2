@@ -1,4 +1,4 @@
-// Monaco Editor Integration for Electron - Simplified CDN Approach
+// Monaco Editor Integration for Electron - Local Node Version
 const path = require('path');
 const fs = require('fs');
 
@@ -12,7 +12,7 @@ class MonacoEditorManager {
     }
 
     /**
-     * Initialize Monaco Editor using CDN (simpler and more reliable)
+     * Initialize Monaco Editor using local node_modules
      * @param {HTMLElement} container - The container element for the editor
      */
     async init(container) {
@@ -22,114 +22,113 @@ class MonacoEditorManager {
         }
 
         try {
-            console.log('Initializing Monaco Editor via CDN...');
+            console.log('Initializing Monaco Editor from local node_modules...');
 
-            // Use CDN for simplicity and reliability in Electron
-            const monacoVersion = '0.52.0'; // Stable version
-            const baseUrl = `https://cdn.jsdelivr.net/npm/monaco-editor@${monacoVersion}/min`;
+            // Resolving paths
+            // We assume 'monaco-editor' is installed and resolvable
+            const monacoPkgPath = require.resolve('monaco-editor/package.json');
+            const monacoPath = path.dirname(monacoPkgPath);
+            const vsDir = path.join(monacoPath, 'min/vs');
+            const loaderPath = path.join(vsDir, 'loader.js');
 
-            // Configure Monaco Environment
+            if (!fs.existsSync(loaderPath)) {
+                throw new Error(`Monaco loader not found at ${loaderPath}`);
+            }
+
+            // Load CSS manually
+            const cssPath = path.join(vsDir, 'editor/editor.main.css');
+            const cssLink = document.createElement('link');
+            cssLink.rel = 'stylesheet';
+            cssLink.href = `file://${cssPath}`;
+            document.head.appendChild(cssLink);
+
+            // Load AMD Loader via Node require
+            // This exposes 'require' and 'define' from the loader
+            const amdLoader = require(loaderPath);
+            const amdRequire = amdLoader.require;
+
+            // Helper to convert path to URI for AMD config
+            function uriFromPath(_path) {
+                let pathName = path.resolve(_path).replace(/\\/g, '/');
+                if (pathName.length > 0 && pathName.charAt(0) !== '/') {
+                    pathName = '/' + pathName;
+                }
+                return encodeURI('file://' + pathName);
+            }
+
+            // Config AMD Loader
+            amdRequire.config({
+                baseUrl: uriFromPath(path.join(monacoPath, 'min'))
+            });
+
+            // Electron/Node integration workaround
+            // Monaco's loader might get confused by 'module' global
+            self.module = undefined;
+
+            // Worker Configuration
+            // For 0.55+ in Electron, we let Monaco use its default worker loading strategy.
+            // If that fails (e.g. 404s), we might need more complex blob handling,
+            // but usually valid baseUrl is enough for standard workers.
             window.MonacoEnvironment = {
                 getWorkerUrl: function (moduleId, label) {
-                    if (label === 'json') {
-                        return `${baseUrl}/vs/language/json/json.worker.js`;
-                    }
-                    if (label === 'css' || label === 'scss' || label === 'less') {
-                        return `${baseUrl}/vs/language/css/css.worker.js`;
-                    }
-                    if (label === 'html' || label === 'handlebars' || label === 'razor') {
-                        return `${baseUrl}/vs/language/html/html.worker.js`;
-                    }
-                    if (label === 'typescript' || label === 'javascript') {
-                        return `${baseUrl}/vs/language/typescript/ts.worker.js`;
-                    }
-                    return `${baseUrl}/vs/editor/editor.worker.js`;
+                    return null; // Use default behavior
                 }
             };
 
-            // Load Monaco from CDN
-            console.log('Loading Monaco from CDN...');
-
-            // Load CSS
-            const cssLink = document.createElement('link');
-            cssLink.rel = 'stylesheet';
-            cssLink.href = `${baseUrl}/vs/editor/editor.main.css`;
-            document.head.appendChild(cssLink);
-
-            // Configure AMD loader
-            window.require = { paths: { vs: `${baseUrl}/vs` } };
-
-            // Load loader script
+            // Load Editor Module
             await new Promise((resolve, reject) => {
-                const loaderScript = document.createElement('script');
-                loaderScript.src = `${baseUrl}/vs/loader.js`;
-                loaderScript.onload = resolve;
-                loaderScript.onerror = () => reject(new Error('Failed to load Monaco loader from CDN'));
-                document.head.appendChild(loaderScript);
-            });
-
-            console.log('Loader loaded, loading Monaco Editor...');
-
-            // Load Monaco Editor
-            const monaco = await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Monaco loading timeout')), 15000);
-
-                window.require(['vs/editor/editor.main'], (monacoModule) => {
-                    clearTimeout(timeout);
-                    if (monacoModule) {
-                        resolve(monacoModule);
-                    } else {
-                        reject(new Error('Monaco module undefined'));
-                    }
+                amdRequire(['vs/editor/editor.main'], () => {
+                    resolve();
                 }, (err) => {
-                    clearTimeout(timeout);
                     reject(err);
                 });
             });
 
-            console.log('Monaco loaded successfully');
-            window.monaco = monaco;
+            console.log('Monaco modules loaded.');
 
-            // Create the editor instance
-            console.log('Creating editor instance...');
-            this.editor = monaco.editor.create(container, {
-                value: '# Welcome to Monaco Editor!\n# Open a file from the file tree to start editing.',
-                language: 'python',
-                theme: 'vs',
-                fontSize: 13,
-                fontFamily: "'Courier New', Courier, monospace",
-                lineNumbers: 'on',
-                roundedSelection: false,
-                scrollBeyondLastLine: false,
-                readOnly: false,
-                automaticLayout: true,
-                minimap: { enabled: true },
-                scrollbar: {
-                    verticalScrollbarSize: 10,
-                    horizontalScrollbarSize: 10
-                },
-                suggestOnTriggerCharacters: true,
-                quickSuggestions: true,
-                wordBasedSuggestions: 'matchingDocuments',
-                tabSize: 4,
-                insertSpaces: true,
-                renderWhitespace: 'selection',
-                cursorStyle: 'line',
-                cursorBlinking: 'blink'
-            });
+            // Create Editor
+            this._createEditor(container);
 
-            // Set up event listeners
+            // Setup Listeners
             this._setupEventListeners();
 
             this.isInitialized = true;
-            console.log('Monaco Editor initialized successfully!');
+            console.log('Monaco Manager initialized.');
 
-            return this.editor;
         } catch (error) {
             console.error('Failed to initialize Monaco Editor:', error);
-            console.error('Error details:', error.message, error.stack);
             throw error;
         }
+    }
+
+    _createEditor(container) {
+        if (this.editor) return;
+
+        this.editor = monaco.editor.create(container, {
+            value: '# Welcome to Monaco Editor!\n# Open a file from the file tree to start editing.',
+            language: 'python',
+            theme: 'vs', // Standard light theme
+            fontSize: 13,
+            fontFamily: "'Courier New', Courier, monospace",
+            lineNumbers: 'on',
+            roundedSelection: false,
+            scrollBeyondLastLine: false,
+            readOnly: false,
+            automaticLayout: true,
+            minimap: { enabled: true },
+            scrollbar: {
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10
+            },
+            suggestOnTriggerCharacters: true,
+            quickSuggestions: true,
+            wordBasedSuggestions: 'matchingDocuments',
+            tabSize: 4,
+            insertSpaces: true,
+            renderWhitespace: 'selection',
+            cursorStyle: 'line',
+            cursorBlinking: 'blink'
+        });
     }
 
     /**
@@ -137,8 +136,6 @@ class MonacoEditorManager {
      */
     _setupEventListeners() {
         if (!this.editor) return;
-
-        const monaco = window.monaco;
 
         // Content change listener for auto-save
         this.editor.onDidChangeModelContent((e) => {
@@ -174,28 +171,6 @@ class MonacoEditorManager {
     }
 
     /**
-     * Load a script dynamically
-     * @param {string} scriptPath - Path to the script file
-     * @returns {Promise} Resolves when script is loaded
-     */
-    _loadScript(scriptPath) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = scriptPath;
-            script.onload = () => {
-                console.log(`Loaded script: ${scriptPath}`);
-                resolve();
-            };
-            script.onerror = (error) => {
-                console.error(`Failed to load script: ${scriptPath}`, error);
-                reject(new Error(`Failed to load script: ${scriptPath}`));
-            };
-            document.head.appendChild(script);
-        });
-    }
-
-
-    /**
      * Open a file in the editor
      * @param {string} filePath - Path to the file
      * @param {string} content - File content
@@ -217,7 +192,15 @@ class MonacoEditorManager {
         if (!model) {
             // Create a new model
             const uri = monaco.Uri.file(filePath);
-            model = monaco.editor.createModel(content, language, uri);
+
+            // Check if model already exists in Monaco core (loaded via other means)
+            const existing = monaco.editor.getModel(uri);
+            if (existing) {
+                model = existing;
+                model.setValue(content);
+            } else {
+                model = monaco.editor.createModel(content, language, uri);
+            }
             this.models.set(filePath, model);
         } else {
             // Update existing model if content changed
