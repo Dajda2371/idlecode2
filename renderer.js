@@ -504,8 +504,9 @@ function renderCode(content) {
         lineNumbers.innerHTML = '';
 
         lines.forEach((line, index) => {
-            const highlightedLine = hljs.highlight(line || ' ', { language: 'python' }).value;
-            newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
+            // Using empty string if line is empty, height is already enforced via style
+            const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
+            newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
 
             const numDiv = document.createElement('div');
             numDiv.textContent = index + 1;
@@ -520,16 +521,43 @@ function renderCode(content) {
 
     // Line and Column tracker
     const updateCaretPosition = () => {
-        const { start } = getSelectionOffsets(codeContent);
-        const text = codeContent.innerText;
-        const textBeforeCaret = text.substring(0, start);
-        const lines = textBeforeCaret.split('\n');
-        const ln = lines.length;
-        const col = lines[lines.length - 1].length;
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+
+        // Find the line div (direct child of codeContent)
+        let container = range.startContainer;
+        if (container === codeContent) {
+            // Caret might be between divs
+            container = codeContent.childNodes[range.startOffset] || codeContent.lastChild;
+        }
+
+        while (container && container.parentNode !== codeContent && container !== codeContent) {
+            container = container.parentNode;
+        }
+
+        if (!container || container === codeContent) {
+            // Fallback for edge cases
+            const { start } = getSelectionOffsets(codeContent);
+            const lines = codeContent.innerText.substring(0, start).split('\n');
+            document.getElementById('footer-ln').textContent = `Ln: ${lines.length}`;
+            document.getElementById('footer-col').textContent = `Col: ${lines[lines.length - 1].length}`;
+            return;
+        }
+
+        const ln = Array.from(codeContent.children).indexOf(container) + 1;
+
+        // Column logic: offset within this specific div
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(container);
+        preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+        // Use textContent or toString() but be careful with <br>
+        const col = preCaretRange.toString().length;
 
         const lnDiv = document.getElementById('footer-ln');
         const colDiv = document.getElementById('footer-col');
-        if (lnDiv) lnDiv.textContent = `Ln: ${ln}`;
+        if (lnDiv) lnDiv.textContent = `Ln: ${ln > 0 ? ln : 1}`;
         if (colDiv) colDiv.textContent = `Col: ${col}`;
     };
 
