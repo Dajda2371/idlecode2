@@ -1,60 +1,11 @@
 const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron')
 const path = require('path')
-const { spawn, fork } = require('child_process');
+const { spawn } = require('child_process');
 
-// Start ElectronWebViewer server
-let viewerServer = null;
-try {
-    viewerServer = fork(path.join(__dirname, 'ElectronWebViewer', 'server.js'));
-    console.log('[ElectronWebViewer] Server process started');
-} catch (error) {
-    console.error('[ElectronWebViewer] Failed to start server:', error);
-}
+// ElectronWebViewer - Easy web-based streaming for any Electron app
+const setupWebViewer = require('./ElectronWebViewer/integrate');
 
 let mainWindow = null;
-let isCapturing = false;
-let captureInterval = null;
-
-// Screen capture function using webContents.capturePage
-async function captureScreen() {
-    if (!mainWindow || mainWindow.isDestroyed() || isCapturing) return;
-
-    isCapturing = true;
-
-    try {
-        // Capture the page content
-        const image = await mainWindow.webContents.capturePage();
-        const screenshot = image.toDataURL();
-
-        // Send to viewer server
-        if (viewerServer && viewerServer.connected) {
-            viewerServer.send({
-                type: 'frame',
-                image: screenshot,
-                timestamp: Date.now()
-            });
-        }
-    } catch (error) {
-        console.error('[Capture] Error:', error.message);
-    } finally {
-        isCapturing = false;
-    }
-}
-
-// Handle messages from viewer server  
-if (viewerServer) {
-    viewerServer.on('message', (msg) => {
-        if (msg.type === 'request-frame') {
-            captureScreen();
-        } else if (msg.type === 'mouse-event' && mainWindow) {
-            // Simulate mouse event in main window
-            mainWindow.webContents.sendInputEvent(msg.data);
-        } else if (msg.type === 'keyboard-event' && mainWindow) {
-            // Simulate keyboard event
-            mainWindow.webContents.sendInputEvent(msg.data);
-        }
-    });
-}
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -67,8 +18,11 @@ function createWindow() {
         }
     })
 
-    mainWindow = win; // Store reference for API
+    mainWindow = win;
     win.loadFile('index.html')
+
+    // Setup web viewer - that's it! Just one line to enable streaming
+    setupWebViewer(win, { port: 8080 });
 
     const template = [
         {
