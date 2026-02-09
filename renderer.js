@@ -1286,18 +1286,31 @@ consoleInput.addEventListener('keydown', (e) => {
 
 // --- Initialization ---
 
+console.log('[Console Init] Starting console initialization...');
+
+const addConsoleBtnCheck = document.getElementById('add-console-btn');
+console.log('[Console Init] Add button element:', addConsoleBtnCheck);
+
 if (addConsoleBtn) {
-    addConsoleBtn.onclick = (e) => { // Use onclick for simplicity/robustness
-        console.log('Add console button clicked!', e);
+    console.log('[Console Init] Setting up add console button handlers');
+
+    // Remove any existing handlers first
+    const newBtn = addConsoleBtn.cloneNode(true);
+    addConsoleBtn.parentNode.replaceChild(newBtn, addConsoleBtn);
+
+    // Now add handler to the fresh button
+    newBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Console] Add button clicked! Creating new console...');
         createConsole();
+        return false;
     };
 
-    // Also add event listener as backup
-    addConsoleBtn.addEventListener('click', (e) => {
-        console.log('Add console via addEventListener', e);
-    });
+    console.log('[Console Init] Button handler attached successfully');
 } else {
-    console.error('Add Console Button not found!');
+    console.error('[Console Init] ERROR: Add Console Button not found!');
+    console.log('[Console Init] Available elements:', document.querySelectorAll('[id*="console"]'));
 }
 
 renderConsoleList();
