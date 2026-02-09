@@ -518,6 +518,27 @@ function renderCode(content) {
         codeContent.innerHTML = newHtml;
     }
 
+    // Line and Column tracker
+    const updateCaretPosition = () => {
+        const { start } = getSelectionOffsets(codeContent);
+        const text = codeContent.innerText;
+        const textBeforeCaret = text.substring(0, start);
+        const lines = textBeforeCaret.split('\n');
+        const ln = lines.length;
+        const col = lines[lines.length - 1].length;
+
+        const lnDiv = document.getElementById('footer-ln');
+        const colDiv = document.getElementById('footer-col');
+        if (lnDiv) lnDiv.textContent = `Ln: ${ln}`;
+        if (colDiv) colDiv.textContent = `Col: ${col}`;
+    };
+
+    document.addEventListener('selectionchange', () => {
+        if (document.activeElement === codeContent) {
+            updateCaretPosition();
+        }
+    });
+
     codeContent.onkeydown = (e) => {
         if (e.key === 'Tab') {
             e.preventDefault();
