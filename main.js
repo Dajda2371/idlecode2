@@ -324,11 +324,30 @@ app.whenReady().then(() => {
     });
 
     app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
+        const wins = BrowserWindow.getAllWindows();
+        if (wins.length === 0) {
             createWindow()
+        } else {
+            // If window execution context exists but window is hidden/minimized
+            wins[0].show();
         }
     })
 })
+
+// IPC for Window Visibility
+ipcMain.on('hide-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.hide();
+});
+
+ipcMain.on('show-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+        if (win.isMinimized()) win.restore();
+        win.show();
+        win.focus();
+    }
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {

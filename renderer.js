@@ -42,7 +42,16 @@ ipcRenderer.on('open-folder', (event, folderPath) => {
 
 // View Transitions
 function initializeLayout() {
-    // Hide Sidebars
+    // Create Default Shell and Pop Out
+    if (typeof createConsole === 'function') {
+        const defaultConsole = createConsole('Python Shell');
+        ipcRenderer.send('pop-out-session', defaultConsole.id, defaultConsole.name);
+    }
+
+    // Hide Main Window (Editor)
+    ipcRenderer.send('hide-window');
+
+    // Allow main window to have editor ready but hidden
     const explorer = document.getElementById('explorer-sidebar');
     const explorerResizer = document.getElementById('explorer-resizer');
     const agent = document.getElementById('agent-sidebar');
@@ -54,61 +63,36 @@ function initializeLayout() {
     if (agentResizer) agentResizer.style.display = 'none';
 
     // Hide Editor Area
-    const editorArea = document.getElementById('editor-area'); // Defines the flex-1 area for editor
-    // Note: 'editor-area' contains 'monaco-editor-container' and modals.
-    // If we hide it, we hide modals too?
-    // Modals are usually children of editor-area in this HTML structure (Step 243).
-    // Yes, modals are inside.
-    // But settings modal is global? 
-    // Step 243: settings-modal is inside editor-area.
-    // If we hide editor-area, settings dialog won't show.
-    // Ideally we just hide 'monaco-editor-container'. 
-    // But 'editor-area' takes up the space. 
-    // If we hide 'monaco-editor-container', editor-area is empty but still flex-1?
-    // Let's hide 'editor-area' but verify modal usage.
-    // If user opens settings at startup, it won't show.
-    // But standard usage is File -> Open first.
-    // I'll proceed with hiding 'editor-area'.
+    const editorArea = document.getElementById('editor-area');
     if (editorArea) editorArea.style.display = 'none';
 
-    // Maximize Console
+    // Hide Local Console Area (since popped out)
     const consoleArea = document.getElementById('console-area');
     const consoleResizer = document.getElementById('console-v-resizer');
-
-    if (consoleArea) {
-        consoleArea.classList.remove('h-[250px]'); // Remove fixed height
-        consoleArea.classList.add('flex-1');      // Make it fill space
-        consoleArea.style.display = 'flex';
-    }
+    if (consoleArea) consoleArea.style.display = 'none';
     if (consoleResizer) consoleResizer.style.display = 'none';
 
     // Update Menu Checkboxes
     ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', false);
     ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
-    ipcRenderer.send('update-menu-checkbox', 'menu-view-console', true);
+    ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
 
-    // Update saved state for toggling
-    if (typeof savedSidebarState !== 'undefined') {
-        savedSidebarState = { explorer: false, agent: false, console: true };
-    }
+    savedSidebarState = { explorer: false, agent: false, console: false };
 }
 
 function switchToEditorView() {
+    // Show Main Window
+    ipcRenderer.send('show-window');
+
     // Show Editor
     const editorArea = document.getElementById('editor-area');
     if (editorArea) {
-        editorArea.style.display = 'flex'; // Restore flex
+        editorArea.style.display = 'flex';
     }
 
-    // Restore Console
-    const consoleArea = document.getElementById('console-area');
-    const consoleResizer = document.getElementById('console-v-resizer');
-
-    if (consoleArea) {
-        consoleArea.classList.remove('flex-1');
-        consoleArea.classList.add('h-[250px]');
-    }
-    if (consoleResizer) consoleResizer.style.display = 'block';
+    // Restore Console to bottom panel if needed? 
+    // User requested popped out shell. So we keep local console hidden.
+    // If user wants it back, they can use Toggle Sidebars or View Console.
 
     // Trigger resize
     if (window.monaco && window.monaco.editor) {
