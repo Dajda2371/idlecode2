@@ -1058,7 +1058,10 @@ consoleInput.addEventListener('keydown', (e) => {
         if (currentConsole && currentConsole.historyIndex > 0) {
             currentConsole.historyIndex--;
             consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex] || '';
-            // Update draft? No.
+            // Place cursor at the end
+            setTimeout(() => {
+                consoleInput.selectionStart = consoleInput.selectionEnd = consoleInput.value.length;
+            }, 0);
         }
     } else if (e.key === 'ArrowDown') {
         const currentConsole = consoles.find(c => c.id === activeConsoleId);
@@ -1066,6 +1069,9 @@ consoleInput.addEventListener('keydown', (e) => {
             if (currentConsole.historyIndex < currentConsole.commandHistory.length - 1) {
                 currentConsole.historyIndex++;
                 consoleInput.value = currentConsole.commandHistory[currentConsole.historyIndex] || '';
+                setTimeout(() => {
+                    consoleInput.selectionStart = consoleInput.selectionEnd = consoleInput.value.length;
+                }, 0);
             } else {
                 currentConsole.historyIndex = currentConsole.commandHistory.length;
                 consoleInput.value = '';

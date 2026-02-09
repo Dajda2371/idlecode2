@@ -178,12 +178,18 @@ consoleInput.addEventListener('keydown', (e) => {
         if (historyIndex > 0) {
             historyIndex--;
             consoleInput.value = commandHistory[historyIndex] || '';
-            // Update draft? No, draft is for manual typing.
+            // Place cursor at the end
+            setTimeout(() => {
+                consoleInput.selectionStart = consoleInput.selectionEnd = consoleInput.value.length;
+            }, 0);
         }
     } else if (e.key === 'ArrowDown') {
         if (historyIndex < commandHistory.length - 1) {
             historyIndex++;
             consoleInput.value = commandHistory[historyIndex] || '';
+            setTimeout(() => {
+                consoleInput.selectionStart = consoleInput.selectionEnd = consoleInput.value.length;
+            }, 0);
         } else {
             historyIndex = commandHistory.length;
             consoleInput.value = '';
