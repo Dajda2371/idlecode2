@@ -419,69 +419,102 @@ function renderCode(content) {
     initHistory(content);
 }
 
-// Helper to get selection character offsets
+// Helper to get selection as {line, col} for start and end
 function getSelectionOffsets(element) {
     const selection = window.getSelection();
-    if (selection.rangeCount === 0) return { start: 0, end: 0 };
+    if (selection.rangeCount === 0) return { startLine: 0, startCol: 0, endLine: 0, endCol: 0 };
     const range = selection.getRangeAt(0);
 
-    const preStartRange = range.cloneRange();
-    preStartRange.selectNodeContents(element);
-    preStartRange.setEnd(range.startContainer, range.startOffset);
-    const start = preStartRange.toString().length;
+    const getPos = (container, offset) => {
+        let node = container;
+        // Find the line div (direct child of element)
+        while (node && node.parentNode !== element && node !== element) {
+            node = node.parentNode;
+        }
 
-    const preEndRange = range.cloneRange();
-    preEndRange.selectNodeContents(element);
-    preEndRange.setEnd(range.endContainer, range.endOffset);
-    const end = preEndRange.toString().length;
+        const lineIndex = Array.from(element.children).indexOf(node);
+        const line = lineIndex !== -1 ? lineIndex : 0;
 
-    return { start, end };
+        // Calculate column within that line div
+        const preCaretRange = document.createRange();
+        preCaretRange.selectNodeContents(node || element.children[line] || element);
+        preCaretRange.setEnd(container, offset);
+        const col = preCaretRange.toString().length;
+
+        return { line, col };
+    };
+
+    const start = getPos(range.startContainer, range.startOffset);
+    const end = getPos(range.endContainer, range.endOffset);
+
+    return {
+        startLine: start.line, startCol: start.col,
+        endLine: end.line, endCol: end.col
+    };
 }
 
-// Helper to set selection character offsets
-function setSelectionOffsets(element, start, end) {
-    let charCount = 0;
+// Helper to set selection from {line, col} coordinates
+function setSelectionOffsets(element, offsets) {
+    const { startLine, startCol, endLine, endCol } = offsets;
+    const selection = window.getSelection();
     const range = document.createRange();
-    const nodeStack = [element];
-    let node;
-    let startSet = false;
-    let endSet = false;
 
-    while ((node = nodeStack.pop())) {
-        if (node.nodeType === 3) {
-            const nextCharCount = charCount + node.length;
-            if (!startSet && start >= charCount && start <= nextCharCount) {
-                range.setStart(node, start - charCount);
-                startSet = true;
-            }
-            if (!endSet && end >= charCount && end <= nextCharCount) {
-                range.setEnd(node, end - charCount);
-                endSet = true;
-            }
-            if (startSet && endSet) break;
-            charCount = nextCharCount;
-        } else {
-            let i = node.childNodes.length;
-            while (i--) {
-                nodeStack.push(node.childNodes[i]);
+    const setPos = (targetRange, isStart, line, col) => {
+        const row = element.children[line] || element.lastElementChild;
+        if (!row) return;
+
+        let charCount = 0;
+        const nodeStack = [row];
+        let node;
+        let set = false;
+
+        while ((node = nodeStack.pop())) {
+            if (node.nodeType === 3) {
+                const nextCharCount = charCount + node.length;
+                if (col >= charCount && col <= nextCharCount) {
+                    if (isStart) targetRange.setStart(node, col - charCount);
+                    else targetRange.setEnd(node, col - charCount);
+                    set = true;
+                    break;
+                }
+                charCount = nextCharCount;
+            } else {
+                for (let i = node.childNodes.length - 1; i >= 0; i--) {
+                    nodeStack.push(node.childNodes[i]);
+                }
             }
         }
-    }
 
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
+        if (!set) {
+            // Fallback to end of last node in row
+            const lastNode = row.lastChild || row;
+            const offset = (lastNode.nodeType === 3) ? lastNode.length : row.childNodes.length;
+            if (isStart) targetRange.setStart(lastNode, offset);
+            else targetRange.setEnd(lastNode, offset);
+        }
+    };
+
+    try {
+        setPos(range, true, startLine, startCol);
+        setPos(range, false, endLine, endCol);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    } catch (e) {
+        console.error("Failed to set selection:", e);
+    }
 }
 
 // Real-time highlighting and line number sync
 codeContent.oninput = () => {
-    const { start, end } = getSelectionOffsets(codeContent);
+    const offsets = getSelectionOffsets(codeContent);
     const scrollTop = codeContent.scrollTop;
 
     // Get lines from children to avoid global innerText quirks
-    let currentLines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
+    // We flatMap and split by \n to ensure each line gets its own div
+    let currentLines = Array.from(codeContent.children).flatMap(div => div.innerText.replace(/\n$/, '').split('\n'));
     if (currentLines.length === 0) {
-        const text = codeContent.innerText.replace(/\n$/, '');
+        let text = codeContent.innerText;
+        if (text.endsWith('\n')) text = text.slice(0, -1);
         currentLines = text ? text.split('\n') : [''];
     }
 
@@ -489,7 +522,7 @@ codeContent.oninput = () => {
     renderLines(currentLines);
 
     codeContent.scrollTop = scrollTop;
-    setSelectionOffsets(codeContent, start, end);
+    setSelectionOffsets(codeContent, offsets);
 
     // Ensure scroll sync is maintained
     lineNumbers.scrollTop = codeContent.scrollTop;
@@ -537,11 +570,9 @@ const updateCaretPosition = () => {
     }
 
     if (!container || container === codeContent) {
-        // Fallback for edge cases
-        const { start } = getSelectionOffsets(codeContent);
-        const lines = codeContent.innerText.substring(0, start).split('\n');
-        document.getElementById('footer-ln').textContent = `Ln: ${lines.length}`;
-        document.getElementById('footer-col').textContent = `Col: ${lines[lines.length - 1].length}`;
+        const offsets = getSelectionOffsets(codeContent);
+        document.getElementById('footer-ln').textContent = `Ln: ${offsets.startLine + 1}`;
+        document.getElementById('footer-col').textContent = `Col: ${offsets.startCol}`;
         return;
     }
 
@@ -574,19 +605,16 @@ codeContent.onkeydown = (e) => {
     } else if (e.key === 'Enter') {
         e.preventDefault();
 
-        let text = codeContent.innerText;
-        // Trim standard trailing block newline for accurate caret/line mapping
-        if (text.endsWith('\n')) text = text.slice(0, -1);
+        const offsets = getSelectionOffsets(codeContent);
+        const currentLineDiv = codeContent.children[offsets.startLine];
+        const lineText = currentLineDiv ? currentLineDiv.innerText.replace(/\n$/, '') : '';
+        const textBeforeCaret = lineText.substring(0, offsets.startCol);
 
-        const { start } = getSelectionOffsets(codeContent);
-        const linesBefore = text.substring(0, start).split('\n');
-        const currentLine = linesBefore[linesBefore.length - 1];
-
-        const match = currentLine.match(/^ */);
+        const match = textBeforeCaret.match(/^ */);
         let indent = match ? match[0] : '';
 
-        // If line ends with colon, increase indent
-        if (currentLine.trim().endsWith(':')) {
+        // If part of line before caret ends with colon, increase indent
+        if (textBeforeCaret.trim().endsWith(':')) {
             indent += '    ';
         }
 
@@ -654,11 +682,10 @@ function scheduleHistorySave() {
 
 function saveHistoryState() {
     const text = codeContent.innerText;
-    const { start, end } = getSelectionOffsets(codeContent);
+    const offsets = getSelectionOffsets(codeContent);
 
     if (lastState && lastState.text === text) {
-        lastState.start = start;
-        lastState.end = end;
+        lastState.offsets = offsets;
         return;
     }
 
@@ -668,14 +695,13 @@ function saveHistoryState() {
         redoStack = [];
     }
 
-    lastState = { text, start, end };
+    lastState = { text, offsets };
 }
 
 ipcRenderer.on('edit-undo', () => {
     if (undoStack.length === 0) return;
 
-    // Save current state before undoing so we can redo back to it
-    const currentState = { text: codeContent.innerText, ...getSelectionOffsets(codeContent) };
+    const currentState = { text: codeContent.innerText, offsets: getSelectionOffsets(codeContent) };
     redoStack.push(currentState);
 
     const state = undoStack.pop();
@@ -686,7 +712,7 @@ ipcRenderer.on('edit-undo', () => {
 ipcRenderer.on('edit-redo', () => {
     if (redoStack.length === 0) return;
 
-    const currentState = { text: codeContent.innerText, ...getSelectionOffsets(codeContent) };
+    const currentState = { text: codeContent.innerText, offsets: getSelectionOffsets(codeContent) };
     undoStack.push(currentState);
 
     const state = redoStack.pop();
@@ -696,9 +722,10 @@ ipcRenderer.on('edit-redo', () => {
 
 function applyHistoryState(state) {
     const lines = state.text.split('\n');
+    if (lines[lines.length - 1] === '' && state.text.length > 0) lines.pop(); // Fix trailing newline from innerText
     renderLines(lines);
     setTimeout(() => {
-        setSelectionOffsets(codeContent, state.start, state.end);
+        setSelectionOffsets(codeContent, state.offsets);
     }, 0);
     debouncedSave();
 }
@@ -709,127 +736,125 @@ function applyHistoryState(state) {
 // Format Menu
 ipcRenderer.on('format-indent', () => {
     saveHistoryState();
-    const { start, end } = getSelectionOffsets(codeContent);
-    const text = codeContent.innerText;
-    const lines = text.split('\n');
+    const offsets = getSelectionOffsets(codeContent);
+    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
 
-    let currentPos = 0;
-    let addedTotal = 0;
-    const newLines = lines.map(line => {
-        const lineStart = currentPos;
-        const lineEnd = currentPos + line.length;
-        currentPos = lineEnd + 1; // +1 for \n
-
-        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
-            addedTotal += 4;
+    const newLines = lines.map((line, idx) => {
+        if (idx >= offsets.startLine && idx <= offsets.endLine) {
             return '    ' + line;
         }
         return line;
     });
 
     renderLines(newLines);
-    setSelectionOffsets(codeContent, start + 4, end + addedTotal);
+    offsets.startCol += 4;
+    offsets.endCol += 4;
+    setTimeout(() => {
+        setSelectionOffsets(codeContent, offsets);
+    }, 0);
     saveHistoryState();
     debouncedSave();
 });
 
 ipcRenderer.on('format-dedent', () => {
     saveHistoryState();
-    const { start, end } = getSelectionOffsets(codeContent);
-    const text = codeContent.innerText;
-    const lines = text.split('\n');
+    const offsets = getSelectionOffsets(codeContent);
+    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
 
-    let currentPos = 0;
-    let removedFirst = 0;
-    let removedTotal = 0;
+    let startRemoved = 0;
+    let endRemoved = 0;
+
     const newLines = lines.map((line, idx) => {
-        const lineStart = currentPos;
-        const lineEnd = currentPos + line.length;
-        currentPos = lineEnd + 1;
-
-        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
+        if (idx >= offsets.startLine && idx <= offsets.endLine) {
             let removed = 0;
-            let newline = line;
+            let newLine = line;
             if (line.startsWith('    ')) {
                 removed = 4;
-                newline = line.substring(4);
+                newLine = line.substring(4);
             } else if (line.startsWith('\t')) {
                 removed = 1;
-                newline = line.substring(1);
+                newLine = line.substring(1);
             } else {
-                // Try to remove up to 4 spaces
                 const match = line.match(/^ +/);
                 if (match) {
                     removed = Math.min(match[0].length, 4);
-                    newline = line.substring(removed);
+                    newLine = line.substring(removed);
                 }
             }
-
-            if (removed > 0) {
-                removedTotal += removed;
-                // If this is the line where selection starts, track how much we removed there
-                if (start >= lineStart && start <= lineEnd) {
-                    removedFirst = removed;
-                }
-            }
-            return newline;
+            if (idx === offsets.startLine) startRemoved = removed;
+            if (idx === offsets.endLine) endRemoved = removed;
+            return newLine;
         }
         return line;
     });
 
     renderLines(newLines);
-    setSelectionOffsets(codeContent, Math.max(0, start - removedFirst), Math.max(0, end - removedTotal));
+    offsets.startCol = Math.max(0, offsets.startCol - startRemoved);
+    offsets.endCol = Math.max(0, offsets.endCol - endRemoved);
+    setTimeout(() => {
+        setSelectionOffsets(codeContent, offsets);
+    }, 0);
     saveHistoryState();
     debouncedSave();
 });
 
 ipcRenderer.on('format-comment', () => {
-    saveHistoryState(); // Save current state before modification
-    const { start, end } = getSelectionOffsets(codeContent);
-    const text = codeContent.innerText;
-    const lines = text.split('\n');
+    saveHistoryState();
+    const offsets = getSelectionOffsets(codeContent);
+    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
 
-    let currentPos = 0;
-    const newLines = lines.map(line => {
-        const lineStart = currentPos;
-        const lineEnd = currentPos + line.length;
-        currentPos = lineEnd + 1; // +1 for \n
-
-        // If line intersects selection
-        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
+    const newLines = lines.map((line, idx) => {
+        if (idx >= offsets.startLine && idx <= offsets.endLine) {
             return '##' + line;
         }
         return line;
     });
 
     renderLines(newLines);
-    setSelectionOffsets(codeContent, start + 2, end + (newLines.length * 2)); // Approximate restoration
-    saveHistoryState(); // Save state after modification
+    offsets.startCol += 2;
+    offsets.endCol += 2;
+    setTimeout(() => {
+        setSelectionOffsets(codeContent, offsets);
+    }, 0);
+    saveHistoryState();
     debouncedSave();
 });
 
 ipcRenderer.on('format-uncomment', () => {
     saveHistoryState();
-    const { start, end } = getSelectionOffsets(codeContent);
-    const text = codeContent.innerText;
-    const lines = text.split('\n');
+    const offsets = getSelectionOffsets(codeContent);
+    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
 
-    let currentPos = 0;
-    const newLines = lines.map(line => {
-        const lineStart = currentPos;
-        const lineEnd = currentPos + line.length;
-        currentPos = lineEnd + 1;
+    let startRemoved = 0;
+    let endRemoved = 0;
 
-        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
-            if (line.startsWith('##')) return line.substring(2);
-            if (line.startsWith('# ')) return line.substring(2);
-            if (line.startsWith('#')) return line.substring(1);
+    const newLines = lines.map((line, idx) => {
+        if (idx >= offsets.startLine && idx <= offsets.endLine) {
+            let removed = 0;
+            let newLine = line;
+            if (line.startsWith('##')) {
+                removed = 2;
+                newLine = line.substring(2);
+            } else if (line.startsWith('# ')) {
+                removed = 2;
+                newLine = line.substring(2);
+            } else if (line.startsWith('#')) {
+                removed = 1;
+                newLine = line.substring(1);
+            }
+            if (idx === offsets.startLine) startRemoved = removed;
+            if (idx === offsets.endLine) endRemoved = removed;
+            return newLine;
         }
         return line;
     });
 
     renderLines(newLines);
-    setSelectionOffsets(codeContent, Math.max(0, start - 2), Math.max(0, end - 2));
+    offsets.startCol = Math.max(0, offsets.startCol - startRemoved);
+    offsets.endCol = Math.max(0, offsets.endCol - endRemoved);
+    setTimeout(() => {
+        setSelectionOffsets(codeContent, offsets);
+    }, 0);
     saveHistoryState();
     debouncedSave();
 });
