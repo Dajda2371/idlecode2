@@ -645,6 +645,47 @@ codeContent.onkeydown = (e) => {
 
 
         document.execCommand('insertText', false, '\n' + indent);
+    } else if (e.key === 'Backspace') {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        const offsets = getSelectionOffsets(codeContent);
+
+        if (offsets.startCol === 0 && offsets.startLine > 0 && range.collapsed) {
+            const currentLineDiv = codeContent.children[offsets.startLine];
+
+            if (currentLineDiv && currentLineDiv.innerText.replace(/\n$/, '') === '') {
+                e.preventDefault();
+
+                const prevLineDiv = codeContent.children[offsets.startLine - 1];
+                currentLineDiv.remove();
+
+                if (prevLineDiv) {
+                    const newRange = document.createRange();
+                    const newSelection = window.getSelection();
+
+                    const walker = document.createTreeWalker(prevLineDiv, NodeFilter.SHOW_TEXT, null);
+                    let lastTextNode = null;
+                    while (walker.nextNode()) lastTextNode = walker.currentNode;
+
+                    let targetNode = prevLineDiv, targetOffset = 0;
+                    if (lastTextNode) {
+                        targetNode = lastTextNode;
+                        targetOffset = lastTextNode.length;
+                    } else if (prevLineDiv.childNodes.length > 0) {
+                        targetOffset = prevLineDiv.childNodes.length;
+                    }
+
+                    try {
+                        newRange.setStart(targetNode, targetOffset);
+                        newRange.collapse(true);
+                        newSelection.removeAllRanges();
+                        newSelection.addRange(newRange);
+                    } catch (err) { }
+                }
+            }
+        }
     }
 };
 
