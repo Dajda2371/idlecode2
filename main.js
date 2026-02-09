@@ -87,8 +87,8 @@ function createWindow() {
         {
             label: 'Edit',
             submenu: [
-                { label: 'Undo', accelerator: 'CmdOrCtrl+Z', role: 'undo' },
-                { label: 'Redo', accelerator: 'CmdOrCtrl+Shift+Z', role: 'redo' },
+                { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: () => win.webContents.send('edit-undo') },
+                { label: 'Redo', accelerator: 'CmdOrCtrl+Shift+Z', click: () => win.webContents.send('edit-redo') },
                 { type: 'separator' },
                 { label: 'Select All', accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
                 { label: 'Cut', accelerator: 'CmdOrCtrl+X', role: 'cut' },

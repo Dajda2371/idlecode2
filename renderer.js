@@ -417,163 +417,158 @@ function renderCode(content) {
         lineNumbers.scrollTop = codeContent.scrollTop;
     };
 
-    // Helper to get selection character offsets
-    function getSelectionOffsets(element) {
-        const selection = window.getSelection();
-        if (selection.rangeCount === 0) return { start: 0, end: 0 };
-        const range = selection.getRangeAt(0);
+    initHistory(content);
+}
 
-        const preStartRange = range.cloneRange();
-        preStartRange.selectNodeContents(element);
-        preStartRange.setEnd(range.startContainer, range.startOffset);
-        const start = preStartRange.toString().length;
+// Helper to get selection character offsets
+function getSelectionOffsets(element) {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return { start: 0, end: 0 };
+    const range = selection.getRangeAt(0);
 
-        const preEndRange = range.cloneRange();
-        preEndRange.selectNodeContents(element);
-        preEndRange.setEnd(range.endContainer, range.endOffset);
-        const end = preEndRange.toString().length;
+    const preStartRange = range.cloneRange();
+    preStartRange.selectNodeContents(element);
+    preStartRange.setEnd(range.startContainer, range.startOffset);
+    const start = preStartRange.toString().length;
 
-        return { start, end };
-    }
+    const preEndRange = range.cloneRange();
+    preEndRange.selectNodeContents(element);
+    preEndRange.setEnd(range.endContainer, range.endOffset);
+    const end = preEndRange.toString().length;
 
-    // Helper to set selection character offsets
-    function setSelectionOffsets(element, start, end) {
-        let charCount = 0;
-        const range = document.createRange();
-        const nodeStack = [element];
-        let node;
-        let startSet = false;
-        let endSet = false;
+    return { start, end };
+}
 
-        while ((node = nodeStack.pop())) {
-            if (node.nodeType === 3) {
-                const nextCharCount = charCount + node.length;
-                if (!startSet && start >= charCount && start <= nextCharCount) {
-                    range.setStart(node, start - charCount);
-                    startSet = true;
-                }
-                if (!endSet && end >= charCount && end <= nextCharCount) {
-                    range.setEnd(node, end - charCount);
-                    endSet = true;
-                }
-                if (startSet && endSet) break;
-                charCount = nextCharCount;
-            } else {
-                let i = node.childNodes.length;
-                while (i--) {
-                    nodeStack.push(node.childNodes[i]);
-                }
+// Helper to set selection character offsets
+function setSelectionOffsets(element, start, end) {
+    let charCount = 0;
+    const range = document.createRange();
+    const nodeStack = [element];
+    let node;
+    let startSet = false;
+    let endSet = false;
+
+    while ((node = nodeStack.pop())) {
+        if (node.nodeType === 3) {
+            const nextCharCount = charCount + node.length;
+            if (!startSet && start >= charCount && start <= nextCharCount) {
+                range.setStart(node, start - charCount);
+                startSet = true;
+            }
+            if (!endSet && end >= charCount && end <= nextCharCount) {
+                range.setEnd(node, end - charCount);
+                endSet = true;
+            }
+            if (startSet && endSet) break;
+            charCount = nextCharCount;
+        } else {
+            let i = node.childNodes.length;
+            while (i--) {
+                nodeStack.push(node.childNodes[i]);
             }
         }
-
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
     }
 
-    // Backwards compatibility for existing code
-    function getCaretCharacterOffsetWithin(element) {
-        return getSelectionOffsets(element).end;
-    }
-    function setCaretCharacterOffsetWithin(element, offset) {
-        setSelectionOffsets(element, offset, offset);
-    }
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
 
-    // Real-time highlighting and line number sync
-    codeContent.oninput = () => {
-        const { start, end } = getSelectionOffsets(codeContent);
-        const scrollTop = codeContent.scrollTop;
-        const text = codeContent.innerText;
-        const currentLines = text.split('\n');
+// Real-time highlighting and line number sync
+codeContent.oninput = () => {
+    const { start, end } = getSelectionOffsets(codeContent);
+    const scrollTop = codeContent.scrollTop;
+    const text = codeContent.innerText;
+    const currentLines = text.split('\n');
 
-        // Re-highlight everything
-        renderLines(currentLines);
+    // Re-highlight everything
+    renderLines(currentLines);
 
-        codeContent.scrollTop = scrollTop;
-        setSelectionOffsets(codeContent, start, end);
+    codeContent.scrollTop = scrollTop;
+    setSelectionOffsets(codeContent, start, end);
 
-        // Ensure scroll sync is maintained
-        lineNumbers.scrollTop = codeContent.scrollTop;
+    // Ensure scroll sync is maintained
+    lineNumbers.scrollTop = codeContent.scrollTop;
 
-        // Autosave
-        debouncedSave();
-    };
+    // History management
+    scheduleHistorySave();
 
-    function renderLines(lines) {
-        let newHtml = '';
-        lineNumbers.innerHTML = '';
+    // Autosave
+    debouncedSave();
+};
 
-        lines.forEach((line, index) => {
-            // Using empty string if line is empty, height is already enforced via style
-            const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-            newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
+function renderLines(lines) {
+    let newHtml = '';
+    lineNumbers.innerHTML = '';
 
-            const numDiv = document.createElement('div');
-            numDiv.textContent = index + 1;
-            numDiv.style.height = '20px';
-            numDiv.style.lineHeight = '20px';
-            numDiv.className = 'h-[20px] leading-[20px]';
-            lineNumbers.appendChild(numDiv);
-        });
+    lines.forEach((line, index) => {
+        // Using empty string if line is empty, height is already enforced via style
+        const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
+        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
 
-        codeContent.innerHTML = newHtml;
-    }
-
-    // Line and Column tracker
-    const updateCaretPosition = () => {
-        const selection = window.getSelection();
-        if (selection.rangeCount === 0) return;
-        const range = selection.getRangeAt(0);
-
-        // Find the line div (direct child of codeContent)
-        let container = range.startContainer;
-        if (container === codeContent) {
-            // Caret might be between divs
-            container = codeContent.childNodes[range.startOffset] || codeContent.lastChild;
-        }
-
-        while (container && container.parentNode !== codeContent && container !== codeContent) {
-            container = container.parentNode;
-        }
-
-        if (!container || container === codeContent) {
-            // Fallback for edge cases
-            const { start } = getSelectionOffsets(codeContent);
-            const lines = codeContent.innerText.substring(0, start).split('\n');
-            document.getElementById('footer-ln').textContent = `Ln: ${lines.length}`;
-            document.getElementById('footer-col').textContent = `Col: ${lines[lines.length - 1].length}`;
-            return;
-        }
-
-        const ln = Array.from(codeContent.children).indexOf(container) + 1;
-
-        // Column logic: offset within this specific div
-        const preCaretRange = range.cloneRange();
-        preCaretRange.selectNodeContents(container);
-        preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-        // Use textContent or toString() but be careful with <br>
-        const col = preCaretRange.toString().length;
-
-        const lnDiv = document.getElementById('footer-ln');
-        const colDiv = document.getElementById('footer-col');
-        if (lnDiv) lnDiv.textContent = `Ln: ${ln > 0 ? ln : 1}`;
-        if (colDiv) colDiv.textContent = `Col: ${col}`;
-    };
-
-    document.addEventListener('selectionchange', () => {
-        if (document.activeElement === codeContent) {
-            updateCaretPosition();
-        }
+        const numDiv = document.createElement('div');
+        numDiv.textContent = index + 1;
+        numDiv.style.height = '20px';
+        numDiv.style.lineHeight = '20px';
+        numDiv.className = 'h-[20px] leading-[20px]';
+        lineNumbers.appendChild(numDiv);
     });
 
-    codeContent.onkeydown = (e) => {
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            document.execCommand('insertText', false, '    ');
-        }
-    };
+    codeContent.innerHTML = newHtml;
 }
+const updateCaretPosition = () => {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+
+    // Find the line div (direct child of codeContent)
+    let container = range.startContainer;
+    if (container === codeContent) {
+        // Caret might be between divs
+        container = codeContent.childNodes[range.startOffset] || codeContent.lastChild;
+    }
+
+    while (container && container.parentNode !== codeContent && container !== codeContent) {
+        container = container.parentNode;
+    }
+
+    if (!container || container === codeContent) {
+        // Fallback for edge cases
+        const { start } = getSelectionOffsets(codeContent);
+        const lines = codeContent.innerText.substring(0, start).split('\n');
+        document.getElementById('footer-ln').textContent = `Ln: ${lines.length}`;
+        document.getElementById('footer-col').textContent = `Col: ${lines[lines.length - 1].length}`;
+        return;
+    }
+
+    const ln = Array.from(codeContent.children).indexOf(container) + 1;
+
+    // Column logic: offset within this specific div
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(container);
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+    // Use textContent or toString() but be careful with <br>
+    const col = preCaretRange.toString().length;
+
+    const lnDiv = document.getElementById('footer-ln');
+    const colDiv = document.getElementById('footer-col');
+    if (lnDiv) lnDiv.textContent = `Ln: ${ln > 0 ? ln : 1}`;
+    if (colDiv) colDiv.textContent = `Col: ${col}`;
+};
+
+document.addEventListener('selectionchange', () => {
+    if (document.activeElement === codeContent) {
+        updateCaretPosition();
+    }
+});
+
+codeContent.onkeydown = (e) => {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        document.execCommand('insertText', false, '    ');
+    }
+};
 
 
 function escapeHtml(text) {
@@ -614,26 +609,158 @@ function debouncedSave() {
     }, 1000); // 1 second debounce
 }
 
+// --- History Manager ---
+let undoStack = [];
+let redoStack = [];
+let lastState = null;
+let historyTimer = null;
+
+function initHistory(text) {
+    undoStack = [];
+    redoStack = [];
+    lastState = { text, start: 0, end: 0 };
+}
+
+function scheduleHistorySave() {
+    if (historyTimer) clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => {
+        saveHistoryState();
+    }, 500); // 500ms debounce for typing
+}
+
+function saveHistoryState() {
+    const text = codeContent.innerText;
+    const { start, end } = getSelectionOffsets(codeContent);
+
+    if (lastState && lastState.text === text) {
+        lastState.start = start;
+        lastState.end = end;
+        return;
+    }
+
+    if (lastState) {
+        undoStack.push(lastState);
+        if (undoStack.length > 100) undoStack.shift();
+        redoStack = [];
+    }
+
+    lastState = { text, start, end };
+}
+
+ipcRenderer.on('edit-undo', () => {
+    if (undoStack.length === 0) return;
+
+    // Save current state before undoing so we can redo back to it
+    const currentState = { text: codeContent.innerText, ...getSelectionOffsets(codeContent) };
+    redoStack.push(currentState);
+
+    const state = undoStack.pop();
+    lastState = state;
+    applyHistoryState(state);
+});
+
+ipcRenderer.on('edit-redo', () => {
+    if (redoStack.length === 0) return;
+
+    const currentState = { text: codeContent.innerText, ...getSelectionOffsets(codeContent) };
+    undoStack.push(currentState);
+
+    const state = redoStack.pop();
+    lastState = state;
+    applyHistoryState(state);
+});
+
+function applyHistoryState(state) {
+    const lines = state.text.split('\n');
+    renderLines(lines);
+    setTimeout(() => {
+        setSelectionOffsets(codeContent, state.start, state.end);
+    }, 0);
+    debouncedSave();
+}
+
 
 // --- Menu Action Listeners ---
 
 // Format Menu
 ipcRenderer.on('format-indent', () => {
-    // Basic indent at cursor or selection substitute
-    document.execCommand('insertText', false, '    ');
+    saveHistoryState();
+    const { start, end } = getSelectionOffsets(codeContent);
+    const text = codeContent.innerText;
+    const lines = text.split('\n');
+
+    let currentPos = 0;
+    let addedTotal = 0;
+    const newLines = lines.map(line => {
+        const lineStart = currentPos;
+        const lineEnd = currentPos + line.length;
+        currentPos = lineEnd + 1; // +1 for \n
+
+        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
+            addedTotal += 4;
+            return '    ' + line;
+        }
+        return line;
+    });
+
+    renderLines(newLines);
+    setSelectionOffsets(codeContent, start + 4, end + addedTotal);
+    saveHistoryState();
+    debouncedSave();
 });
 
 ipcRenderer.on('format-dedent', () => {
-    // Very basic dedent: remove 4 spaces if present at start of line or cursor
-    // Since we don't have full editor state control easily, we'll just try to implement a simple 'shift-tab' behavior
-    // For now, let's keep it simple or user might get frustrated with poor implementation.
-    // If we want true dedent, we need to handle selection. 
-    // Let's implement a naive "remove 4 chars back" for now or wait for better editor.
-    // document.execCommand('delete'); // Too risky
-    alert('Dedent not fully implemented in this basic editor view.');
+    saveHistoryState();
+    const { start, end } = getSelectionOffsets(codeContent);
+    const text = codeContent.innerText;
+    const lines = text.split('\n');
+
+    let currentPos = 0;
+    let removedFirst = 0;
+    let removedTotal = 0;
+    const newLines = lines.map((line, idx) => {
+        const lineStart = currentPos;
+        const lineEnd = currentPos + line.length;
+        currentPos = lineEnd + 1;
+
+        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
+            let removed = 0;
+            let newline = line;
+            if (line.startsWith('    ')) {
+                removed = 4;
+                newline = line.substring(4);
+            } else if (line.startsWith('\t')) {
+                removed = 1;
+                newline = line.substring(1);
+            } else {
+                // Try to remove up to 4 spaces
+                const match = line.match(/^ +/);
+                if (match) {
+                    removed = Math.min(match[0].length, 4);
+                    newline = line.substring(removed);
+                }
+            }
+
+            if (removed > 0) {
+                removedTotal += removed;
+                // If this is the line where selection starts, track how much we removed there
+                if (start >= lineStart && start <= lineEnd) {
+                    removedFirst = removed;
+                }
+            }
+            return newline;
+        }
+        return line;
+    });
+
+    renderLines(newLines);
+    setSelectionOffsets(codeContent, Math.max(0, start - removedFirst), Math.max(0, end - removedTotal));
+    saveHistoryState();
+    debouncedSave();
 });
 
 ipcRenderer.on('format-comment', () => {
+    saveHistoryState(); // Save current state before modification
     const { start, end } = getSelectionOffsets(codeContent);
     const text = codeContent.innerText;
     const lines = text.split('\n');
@@ -653,10 +780,12 @@ ipcRenderer.on('format-comment', () => {
 
     renderLines(newLines);
     setSelectionOffsets(codeContent, start + 2, end + (newLines.length * 2)); // Approximate restoration
+    saveHistoryState(); // Save state after modification
     debouncedSave();
 });
 
 ipcRenderer.on('format-uncomment', () => {
+    saveHistoryState();
     const { start, end } = getSelectionOffsets(codeContent);
     const text = codeContent.innerText;
     const lines = text.split('\n');
@@ -677,25 +806,35 @@ ipcRenderer.on('format-uncomment', () => {
 
     renderLines(newLines);
     setSelectionOffsets(codeContent, Math.max(0, start - 2), Math.max(0, end - 2));
+    saveHistoryState();
     debouncedSave();
 });
 
 ipcRenderer.on('format-tabify', () => {
-    const content = document.getElementById('code-content').innerText;
+    saveHistoryState();
+    const content = codeContent.innerText;
     const newContent = content.replace(/    /g, '\t');
-    document.getElementById('code-content').innerText = newContent;
+    renderLines(newContent.split('\n'));
+    saveHistoryState();
+    debouncedSave();
 });
 
 ipcRenderer.on('format-untabify', () => {
-    const content = document.getElementById('code-content').innerText;
+    saveHistoryState();
+    const content = codeContent.innerText;
     const newContent = content.replace(/\t/g, '    ');
-    document.getElementById('code-content').innerText = newContent;
+    renderLines(newContent.split('\n'));
+    saveHistoryState();
+    debouncedSave();
 });
 
 ipcRenderer.on('format-strip-trailing', () => {
-    const content = document.getElementById('code-content').innerText;
+    saveHistoryState();
+    const content = codeContent.innerText;
     const newContent = content.split('\n').map(line => line.trimEnd()).join('\n');
-    document.getElementById('code-content').innerText = newContent;
+    renderLines(newContent.split('\n'));
+    saveHistoryState();
+    debouncedSave();
 });
 
 
