@@ -630,19 +630,18 @@ ipcRenderer.on('run-module', () => {
         const content = document.getElementById('code-content').innerText;
         fs.writeFileSync(currentFilePath, content);
 
-        // Check if local console is visible
         const consoleArea = document.getElementById('console-area');
-        const isConsoleVisible = consoleArea.style.display !== 'none';
+        const isConsoleVisible = consoleArea && consoleArea.style.display !== 'none';
+
+        // Always use the managed process via runPythonMetadata
+        const consoleData = runPythonMetadata(currentFilePath);
 
         if (isConsoleVisible) {
-            // Run locally
-            runPythonMetadata(currentFilePath);
             // Ensure console is focused/shown
             consoleArea.style.display = 'flex';
         } else {
-            // Run in POP OUT (New Window)
-            // We need to tell Main process to spawn a new window that runs this file.
-            ipcRenderer.send('run-module-popout', currentFilePath);
+            // Pop out OR focus existing pop-out
+            ipcRenderer.send('pop-out-session', consoleData.id, consoleData.name);
         }
     } else {
         alert('Please save the file before running.');
@@ -657,7 +656,7 @@ ipcRenderer.on('menu-new-console', () => {
 
 
 function runPythonMetadata(path) {
-    if (!path) return;
+    if (!path) return null;
 
     // Use active console or create one
     let targetConsole;
@@ -666,11 +665,12 @@ function runPythonMetadata(path) {
     }
 
     if (!targetConsole) {
-        createConsole(`Run: ${path.split(/[/\\]/).pop()}`, path);
+        targetConsole = createConsole(`Run: ${path.split(/[/\\]/).pop()}`, path);
     } else {
         // Restart existing console with this file
         spawnConsoleProcess(targetConsole, path);
     }
+    return targetConsole;
 }
 
 

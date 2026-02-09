@@ -334,29 +334,7 @@ app.on('window-all-closed', () => {
 
 let poppedConsoles = [];
 
-ipcMain.on('run-module-popout', (event, filePath) => {
-    const subWin = new BrowserWindow({
-        width: 800,
-        height: 600,
-        title: `Running: ${path.basename(filePath)}`,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
-        }
-    });
-
-    subWin.loadFile('console.html');
-    poppedConsoles.push(subWin);
-
-    subWin.webContents.once('did-finish-load', () => {
-        subWin.webContents.send('run-file', filePath);
-    });
-
-    subWin.on('closed', () => {
-        const idx = poppedConsoles.indexOf(subWin);
-        if (idx > -1) poppedConsoles.splice(idx, 1);
-    });
-});
+// run-module-popout removed, replaced by pop-out-session logic in renderer.js
 
 ipcMain.on('new-console-window', () => {
     const subWin = new BrowserWindow({
@@ -397,7 +375,40 @@ function broadcastToSession(sessionId, channel, ...args) {
 }
 
 ipcMain.on('session-create', (event, sessionId, filePath) => {
-    if (sessions.has(sessionId)) return;
+    let session = sessions.get(sessionId);
+    let isRestart = false;
+
+    if (session) {
+        if (session.process && !session.process.killed) {
+            console.log(`Session ${sessionId} already active, skipping create.`);
+            return;
+        }
+        // Restarting: Reset existing session state but preserve listeners
+        console.log(`Session ${sessionId} exists but process is dead. Restarting...`);
+        session.history = [];
+        session.commandHistory = [];
+        session.inputDraft = '';
+        session.stderrBuffer = '';
+        session.stdoutBuffer = '';
+        session.waitingForInput = false;
+        session.lastPrompt = '>>>';
+        session.lastPromptType = 'standard';
+        isRestart = true;
+    } else {
+        session = {
+            id: sessionId,
+            history: [],
+            commandHistory: [],
+            inputDraft: '',
+            stderrBuffer: '',
+            stdoutBuffer: '',
+            waitingForInput: false,
+            lastPrompt: '>>>',
+            lastPromptType: 'standard',
+            listeners: new Set()
+        };
+        sessions.set(sessionId, session);
+    }
 
     // Spawn Python Process
     let pythonPath = 'python3'; // Default
@@ -408,22 +419,12 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
     else args.push('-i'); // Interactive mode if no file
 
     const pyProcess = spawn(pythonPath, args);
+    session.process = pyProcess;
 
-    const session = {
-        id: sessionId,
-        process: pyProcess,
-        history: [],
-        commandHistory: [],
-        inputDraft: '',
-        stderrBuffer: '',
-        stdoutBuffer: '',
-        waitingForInput: false,
-        lastPrompt: '>>>',
-        lastPromptType: 'standard',
-        listeners: new Set()
-    };
-
-    sessions.set(sessionId, session);
+    if (isRestart) {
+        // Notify all existing listeners about the reset/new history
+        broadcastToSession(sessionId, 'session-history', [], [], '');
+    }
 
     // Handle Output
     pyProcess.stdout.on('data', (data) => {
@@ -610,8 +611,19 @@ ipcMain.on('session-close', (event, sessionId) => {
     }
 });
 
-// Updated Pop-out Logic: Open window for EXISTING session
+// Track windows by Session ID
+const sessionWindows = new Map();
+
 ipcMain.on('pop-out-session', (event, sessionId, title) => {
+    if (sessionWindows.has(sessionId)) {
+        const existingWin = sessionWindows.get(sessionId);
+        if (!existingWin.isDestroyed()) {
+            existingWin.focus();
+            if (title) existingWin.setTitle(title);
+            return;
+        }
+    }
+
     const subWin = new BrowserWindow({
         width: 800,
         height: 600,
@@ -624,6 +636,7 @@ ipcMain.on('pop-out-session', (event, sessionId, title) => {
 
     subWin.loadFile('console.html');
     poppedConsoles.push(subWin);
+    sessionWindows.set(sessionId, subWin);
 
     // Pass session ID to the new window
     subWin.webContents.once('did-finish-load', () => {
@@ -633,6 +646,7 @@ ipcMain.on('pop-out-session', (event, sessionId, title) => {
     subWin.on('closed', () => {
         const idx = poppedConsoles.indexOf(subWin);
         if (idx > -1) poppedConsoles.splice(idx, 1);
+        sessionWindows.delete(sessionId);
     });
 });
 
