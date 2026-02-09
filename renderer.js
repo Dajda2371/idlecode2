@@ -442,32 +442,43 @@ ipcRenderer.on('toggle-ai-agent', (event, show) => {
 });
 
 // Toggle Sidebars Logic
-let savedSidebarState = { explorer: true, agent: true };
+let savedSidebarState = { explorer: true, agent: true, console: true };
 
 ipcRenderer.on('toggle-sidebars', () => {
     const explorer = document.getElementById('explorer-sidebar');
     const explorerResizer = document.getElementById('explorer-resizer');
     const agent = document.getElementById('agent-sidebar');
     const agentResizer = document.getElementById('agent-resizer');
+    const consoleArea = document.getElementById('console-area');
+    const consoleResizer = document.getElementById('console-v-resizer');
 
     const isExplorerVisible = explorer && explorer.style.display !== 'none';
     const isAgentVisible = agent && agent.style.display !== 'none';
+    const isConsoleVisible = consoleArea && consoleArea.style.display !== 'none';
 
-    if (isExplorerVisible || isAgentVisible) {
+    if (isExplorerVisible || isAgentVisible || isConsoleVisible) {
         // HIDE ALL
-        savedSidebarState = { explorer: isExplorerVisible, agent: isAgentVisible };
+        savedSidebarState = {
+            explorer: isExplorerVisible,
+            agent: isAgentVisible,
+            console: isConsoleVisible
+        };
 
         if (explorer) explorer.style.display = 'none';
         if (explorerResizer) explorerResizer.style.display = 'none';
         if (agent) agent.style.display = 'none';
         if (agentResizer) agentResizer.style.display = 'none';
+        if (consoleArea) consoleArea.style.display = 'none';
+        if (consoleResizer) consoleResizer.style.display = 'none';
 
         ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', false);
         ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
     } else {
         // RESTORE
         const showExplorer = savedSidebarState.explorer;
         const showAgent = savedSidebarState.agent;
+        const showConsole = savedSidebarState.console;
 
         if (showExplorer) {
             if (explorer) explorer.style.display = 'flex';
@@ -477,15 +488,25 @@ ipcRenderer.on('toggle-sidebars', () => {
             if (agent) agent.style.display = 'flex';
             if (agentResizer) agentResizer.style.display = 'block';
         }
+        if (showConsole) {
+            if (consoleArea) consoleArea.style.display = 'flex'; // Console area is flex
+            if (consoleResizer) consoleResizer.style.display = 'block';
+        }
 
-        // If saved state was both hidden, default to showing Explorer
-        if (!showExplorer && !showAgent) {
+        // If saved state was all hidden, default to showing Explorer and Console
+        if (!showExplorer && !showAgent && !showConsole) {
             if (explorer) explorer.style.display = 'flex';
             if (explorerResizer) explorerResizer.style.display = 'block';
+            if (consoleArea) consoleArea.style.display = 'flex';
+            if (consoleResizer) consoleResizer.style.display = 'block';
+
             ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', true);
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false); // Keep agent hidden in default
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-console', true);
         } else {
             ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', showExplorer);
             ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', showAgent);
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-console', showConsole);
         }
     }
 
