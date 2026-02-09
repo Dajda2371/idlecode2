@@ -22,6 +22,7 @@
     "electron": "^40.2.1"
   },
   "dependencies": {
-    "highlight.js": "^11.11.1"
+    "highlight.js": "^11.11.1",
+    "monaco-editor": "^0.55.1"
   }
 }

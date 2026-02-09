@@ -136,11 +136,9 @@
         <div id="explorer-resizer" class="h-resizer"></div>
         <main class="flex-1 flex flex-col bg-white border-r border-gray-200 overflow-hidden">
             <!-- Editor Area -->
-            <div class="flex-1 flex overflow-auto min-h-[200px]" id="editor-area">
-                <div class="w-10 text-right pr-2 text-gray-400 select-none font-mono text-[13px] leading-[20px] pt-4 bg-[#f3f3f3]"
-                    id="line-numbers"></div>
-                <div class="flex-1 outline-none font-mono text-[13px] leading-[20px] whitespace-pre pl-2 pt-4"
-                    id="code-content" contenteditable="false" spellcheck="false"></div>
+            <div class="flex-1 flex overflow-hidden min-h-[200px]" id="editor-area">
+                <!-- Monaco Editor Container -->
+                <div class="flex-1" id="monaco-editor-container"></div>
                 <!-- Modals (Hidden by default) -->
 
                 <!-- Configure IDLE Modal -->

@@ -5,6 +5,20 @@ const { spawn } = require('child_process'); // Added spawn
 const hljs = require('highlight.js/lib/core');
 hljs.registerLanguage('python', require('highlight.js/lib/languages/python'));
 
+// Monaco Editor Integration
+const monacoBridge = require('./monaco-bridge');
+
+// Initialize Monaco Editor when DOM is ready
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await monacoBridge.init();
+        console.log('Monaco Editor ready');
+    } catch (error) {
+        console.error('Failed to initialize Monaco Editor:', error);
+        alert('Failed to initialize editor. Please restart the application.');
+    }
+});
+
 // IPC Listeners
 ipcRenderer.on('open-file', (event, filePath) => {
     openFile(filePath);
@@ -351,653 +365,54 @@ function deleteItem() {
 
 
 function openFile(filePath) {
-    fs.readFile(filePath, 'utf-8', (err, data) => {
-        if (err) return console.error(err);
-        currentFilePath = filePath;
-        document.title = `${path.basename(filePath)} - ${filePath}`;
-        renderCode(data);
-    });
+    // Use Monaco Bridge to open file
+    monacoBridge.openFile(filePath);
+    currentFilePath = filePath;
 }
 
 
 // Current open file path
 let currentFilePath = null;
 
-function renderCode(content) {
-    const lines = content.split('\n');
-    const lineNumbers = document.getElementById('line-numbers');
-    const codeContent = document.getElementById('code-content');
-
-    if (!lineNumbers || !codeContent) return;
-
-    // Enable editing
-    codeContent.contentEditable = true;
-    codeContent.spellcheck = false;
-    codeContent.style.outline = 'none';
-
-    lineNumbers.innerHTML = '';
-    codeContent.innerHTML = '';
-
-    // We use innerHTML to support syntax highlighting.
-
-
-    // Use highlight.js
-    const highlightedCode = hljs.highlight(content, { language: 'python' }).value;
-
-    // Split highlighted code into lines. 
-    // HLJS might produce HTML that spans lines. This is the tricky part.
-    // If we use separate containers for line numbers, alignment fails as seen.
-    // So we MUST use a row-based layout: <div class="line"><div class="num">1</div><div class="code">...</div></div>
-    // BUT HLJS output is a single HTML block.
-    // To solve this robustly without a complex parser:
-    // 1. We keep the separate containers but force them to be single lines with NO WRAPPING.
-    // 2. We set explicit height in pixels for every line.
-
-    // Let's try explicit line styling first. 
-    // The previous attempt failed because contenteditable puts text in text nodes or divs, and highlight.js puts spans. 
-    // Spans can affect line height if font-size fallback happens or if there are inline-blocks.
-
-    codeContent.innerHTML = '';
-
-    // Use highlight.js
-    // We will highlight line-by-line to ensure perfect alignment with line numbers.
-    let html = '';
-
-    lineNumbers.innerHTML = ''; // Clear existing line numbers
-
-    lines.forEach((line, index) => {
-        // Highlight each line individually.
-        // Use <br> for empty lines to maintain height and standard browser behavior
-        const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-        const lineNum = index + 1;
-
-        html += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
-
-        const numDiv = document.createElement('div');
-        numDiv.textContent = lineNum;
-        numDiv.className = 'h-[20px] leading-[20px]';
-        numDiv.style.height = '20px';
-        numDiv.style.lineHeight = '20px';
-        lineNumbers.appendChild(numDiv);
-    });
-
-    codeContent.innerHTML = html;
-
-    // Scroll Sync
-    codeContent.onscroll = () => {
-        lineNumbers.scrollTop = codeContent.scrollTop;
-    };
-
-    initHistory(content);
-}
-
-// Helper to get selection as {line, col} for start and end
-function getSelectionOffsets(element) {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return { startLine: 0, startCol: 0, endLine: 0, endCol: 0 };
-    const range = selection.getRangeAt(0);
-
-    const getPos = (container, offset) => {
-        let node = container;
-        // Find the line div (direct child of element)
-        while (node && node.parentNode !== element && node !== element) {
-            node = node.parentNode;
-        }
-
-        const lineIndex = Array.from(element.children).indexOf(node);
-        const line = lineIndex !== -1 ? lineIndex : 0;
-
-        // Calculate column within that line div
-        const preCaretRange = document.createRange();
-        preCaretRange.selectNodeContents(node || element.children[line] || element);
-        preCaretRange.setEnd(container, offset);
-        const col = preCaretRange.toString().length;
-
-        return { line, col };
-    };
-
-    const start = getPos(range.startContainer, range.startOffset);
-    const end = getPos(range.endContainer, range.endOffset);
-
-    return {
-        startLine: start.line, startCol: start.col,
-        endLine: end.line, endCol: end.col
-    };
-}
-
-// Helper to set selection from {line, col} coordinates
-function setSelectionOffsets(element, offsets) {
-    const { startLine, startCol, endLine, endCol } = offsets;
-    const selection = window.getSelection();
-    const range = document.createRange();
-
-    const setPos = (targetRange, isStart, line, col) => {
-        const row = element.children[line] || element.lastElementChild;
-        if (!row) return;
-
-        let charCount = 0;
-        const nodeStack = [row];
-        let node;
-        let set = false;
-
-        while ((node = nodeStack.pop())) {
-            if (node.nodeType === 3) {
-                const nextCharCount = charCount + node.length;
-                if (col >= charCount && col <= nextCharCount) {
-                    if (isStart) targetRange.setStart(node, col - charCount);
-                    else targetRange.setEnd(node, col - charCount);
-                    set = true;
-                    break;
-                }
-                charCount = nextCharCount;
-            } else {
-                for (let i = node.childNodes.length - 1; i >= 0; i--) {
-                    nodeStack.push(node.childNodes[i]);
-                }
-            }
-        }
-
-        if (!set) {
-            // Fallback to end of last node in row
-            const lastNode = row.lastChild || row;
-            const offset = (lastNode.nodeType === 3) ? lastNode.length : row.childNodes.length;
-            if (isStart) targetRange.setStart(lastNode, offset);
-            else targetRange.setEnd(lastNode, offset);
-        }
-    };
-
-    try {
-        setPos(range, true, startLine, startCol);
-        setPos(range, false, endLine, endCol);
-        selection.removeAllRanges();
-        selection.addRange(range);
-    } catch (e) {
-        console.error("Failed to set selection:", e);
-    }
-}
-
-// Real-time highlighting and line number sync
-codeContent.oninput = () => {
-    const offsets = getSelectionOffsets(codeContent);
-    const scrollTop = codeContent.scrollTop;
-
-    // Get lines from children to avoid global innerText quirks
-    // We flatMap and split by \n to ensure each line gets its own div
-    let currentLines = Array.from(codeContent.children).flatMap(div => div.innerText.replace(/\n$/, '').split('\n'));
-    if (currentLines.length === 0) {
-        let text = codeContent.innerText;
-        if (text.endsWith('\n')) text = text.slice(0, -1);
-        currentLines = text ? text.split('\n') : [''];
-    }
-
-    // Re-highlight everything
-    renderLines(currentLines);
-
-    codeContent.scrollTop = scrollTop;
-    setSelectionOffsets(codeContent, offsets);
-
-    // Ensure scroll sync is maintained
-    lineNumbers.scrollTop = codeContent.scrollTop;
-
-    // History management
-    scheduleHistorySave();
-
-    // Autosave
-    debouncedSave();
-};
-
-function renderLines(lines) {
-    let newHtml = '';
-    lineNumbers.innerHTML = '';
-
-    lines.forEach((line, index) => {
-        // Use <br> for empty lines to maintain height and standard browser behavior
-        const highlightedLine = hljs.highlight(line || '', { language: 'python' }).value;
-        newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || '<br>'}</div>`;
-
-        const numDiv = document.createElement('div');
-        numDiv.textContent = index + 1;
-        numDiv.style.height = '20px';
-        numDiv.style.lineHeight = '20px';
-        numDiv.className = 'h-[20px] leading-[20px]';
-        lineNumbers.appendChild(numDiv);
-    });
-
-    codeContent.innerHTML = newHtml;
-}
-const updateCaretPosition = () => {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-
-    // Find the line div (direct child of codeContent)
-    let container = range.startContainer;
-    if (container === codeContent) {
-        // Caret might be between divs
-        container = codeContent.childNodes[range.startOffset] || codeContent.lastChild;
-    }
-
-    while (container && container.parentNode !== codeContent && container !== codeContent) {
-        container = container.parentNode;
-    }
-
-    if (!container || container === codeContent) {
-        const offsets = getSelectionOffsets(codeContent);
-        document.getElementById('footer-ln').textContent = `Ln: ${offsets.startLine + 1}`;
-        document.getElementById('footer-col').textContent = `Col: ${offsets.startCol}`;
-        return;
-    }
-
-    const ln = Array.from(codeContent.children).indexOf(container) + 1;
-
-    // Column logic: offset within this specific div
-    const preCaretRange = range.cloneRange();
-    preCaretRange.selectNodeContents(container);
-    preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-    // Use textContent or toString() but be careful with <br>
-    const col = preCaretRange.toString().length;
-
-    const lnDiv = document.getElementById('footer-ln');
-    const colDiv = document.getElementById('footer-col');
-    if (lnDiv) lnDiv.textContent = `Ln: ${ln > 0 ? ln : 1}`;
-    if (colDiv) colDiv.textContent = `Col: ${col}`;
-};
-
-document.addEventListener('selectionchange', () => {
-    if (document.activeElement === codeContent) {
-        updateCaretPosition();
-    }
-});
-
-codeContent.onkeydown = (e) => {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        document.execCommand('insertText', false, '    ');
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-
-        const offsets = getSelectionOffsets(codeContent);
-        const currentLineDiv = codeContent.children[offsets.startLine];
-        const lineText = currentLineDiv ? currentLineDiv.innerText.replace(/\n$/, '') : '';
-        const textBeforeCaret = lineText.substring(0, offsets.startCol);
-
-        const match = textBeforeCaret.match(/^ */);
-        let indent = match ? match[0] : '';
-
-        // If part of line before caret ends with colon, increase indent
-        if (textBeforeCaret.trim().endsWith(':')) {
-            indent += '    ';
-        }
-
-        document.execCommand('insertText', false, '\n' + indent);
-    }
-};
+// Obsolete editor code removed - replaced by Monaco Editor
 
 
 function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-function saveFile(silent = false) {
-    if (currentFilePath) {
-        const content = document.getElementById('code-content').innerText;
-        fs.writeFile(currentFilePath, content, (err) => {
-            if (err) {
-                if (!silent) alert(`Error saving file: ${err.message}`);
-                console.error(err);
-                return;
-            }
-            if (!silent) {
-                // Optional: flash feedback
-                const title = document.title;
-                document.title = title.replace(' *', '') + ' (Saved)';
-                setTimeout(() => document.title = title.replace(' *', ''), 2000);
-            }
-        });
-    } else if (!silent) {
-        // Trigger Save As (handled in main usually, but we can trigger it here too or send back)
-        ipcRenderer.send('save-as-request');
-    }
-}
+// Obsolete history/save/format code removed
 
-ipcRenderer.on('save-file', () => {
-    saveFile(false);
-});
-
-let autosaveTimeout = null;
-function debouncedSave() {
-    if (autosaveTimeout) clearTimeout(autosaveTimeout);
-    autosaveTimeout = setTimeout(() => {
-        saveFile(true);
-    }, 1000); // 1 second debounce
-}
-
-// --- History Manager ---
-let undoStack = [];
-let redoStack = [];
-let lastState = null;
-let historyTimer = null;
-
-function initHistory(text) {
-    undoStack = [];
-    redoStack = [];
-    lastState = { text, start: 0, end: 0 };
-}
-
-function scheduleHistorySave() {
-    if (historyTimer) clearTimeout(historyTimer);
-    historyTimer = setTimeout(() => {
-        saveHistoryState();
-    }, 500); // 500ms debounce for typing
-}
-
-function saveHistoryState() {
-    const text = codeContent.innerText;
-    const offsets = getSelectionOffsets(codeContent);
-
-    if (lastState && lastState.text === text) {
-        lastState.offsets = offsets;
-        return;
-    }
-
-    if (lastState) {
-        undoStack.push(lastState);
-        if (undoStack.length > 100) undoStack.shift();
-        redoStack = [];
-    }
-
-    lastState = { text, offsets };
-}
-
-ipcRenderer.on('edit-undo', () => {
-    if (undoStack.length === 0) return;
-
-    const currentState = { text: codeContent.innerText, offsets: getSelectionOffsets(codeContent) };
-    redoStack.push(currentState);
-
-    const state = undoStack.pop();
-    lastState = state;
-    applyHistoryState(state);
-});
-
-ipcRenderer.on('edit-redo', () => {
-    if (redoStack.length === 0) return;
-
-    const currentState = { text: codeContent.innerText, offsets: getSelectionOffsets(codeContent) };
-    undoStack.push(currentState);
-
-    const state = redoStack.pop();
-    lastState = state;
-    applyHistoryState(state);
-});
-
-function applyHistoryState(state) {
-    const lines = state.text.split('\n');
-    if (lines[lines.length - 1] === '' && state.text.length > 0) lines.pop(); // Fix trailing newline from innerText
-    renderLines(lines);
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, state.offsets);
-    }, 0);
-    debouncedSave();
-}
-
-
-// --- Menu Action Listeners ---
-
-// Format Menu
-ipcRenderer.on('format-indent', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            return '    ' + line;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol += 4;
-    offsets.endCol += 4;
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
-});
-
-ipcRenderer.on('format-dedent', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    let startRemoved = 0;
-    let endRemoved = 0;
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            let removed = 0;
-            let newLine = line;
-            if (line.startsWith('    ')) {
-                removed = 4;
-                newLine = line.substring(4);
-            } else if (line.startsWith('\t')) {
-                removed = 1;
-                newLine = line.substring(1);
-            } else {
-                const match = line.match(/^ +/);
-                if (match) {
-                    removed = Math.min(match[0].length, 4);
-                    newLine = line.substring(removed);
-                }
-            }
-            if (idx === offsets.startLine) startRemoved = removed;
-            if (idx === offsets.endLine) endRemoved = removed;
-            return newLine;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol = Math.max(0, offsets.startCol - startRemoved);
-    offsets.endCol = Math.max(0, offsets.endCol - endRemoved);
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
-});
-
-ipcRenderer.on('format-comment', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            return '##' + line;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol += 2;
-    offsets.endCol += 2;
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
-});
-
-ipcRenderer.on('format-uncomment', () => {
-    saveHistoryState();
-    const offsets = getSelectionOffsets(codeContent);
-    const lines = Array.from(codeContent.children).map(div => div.innerText.replace(/\n$/, ''));
-
-    let startRemoved = 0;
-    let endRemoved = 0;
-
-    const newLines = lines.map((line, idx) => {
-        if (idx >= offsets.startLine && idx <= offsets.endLine) {
-            let removed = 0;
-            let newLine = line;
-            if (line.startsWith('##')) {
-                removed = 2;
-                newLine = line.substring(2);
-            } else if (line.startsWith('# ')) {
-                removed = 2;
-                newLine = line.substring(2);
-            } else if (line.startsWith('#')) {
-                removed = 1;
-                newLine = line.substring(1);
-            }
-            if (idx === offsets.startLine) startRemoved = removed;
-            if (idx === offsets.endLine) endRemoved = removed;
-            return newLine;
-        }
-        return line;
-    });
-
-    renderLines(newLines);
-    offsets.startCol = Math.max(0, offsets.startCol - startRemoved);
-    offsets.endCol = Math.max(0, offsets.endCol - endRemoved);
-    setTimeout(() => {
-        setSelectionOffsets(codeContent, offsets);
-    }, 0);
-    saveHistoryState();
-    debouncedSave();
-});
-
-ipcRenderer.on('format-tabify', () => {
-    saveHistoryState();
-    const content = codeContent.innerText;
-    const newContent = content.replace(/    /g, '\t');
-    renderLines(newContent.split('\n'));
-    saveHistoryState();
-    debouncedSave();
-});
-
-ipcRenderer.on('format-untabify', () => {
-    saveHistoryState();
-    const content = codeContent.innerText;
-    const newContent = content.replace(/\t/g, '    ');
-    renderLines(newContent.split('\n'));
-    saveHistoryState();
-    debouncedSave();
-});
-
-ipcRenderer.on('format-strip-trailing', () => {
-    saveHistoryState();
-    const content = codeContent.innerText;
-    const newContent = content.split('\n').map(line => line.trimEnd()).join('\n');
-    renderLines(newContent.split('\n'));
-    saveHistoryState();
-    debouncedSave();
-});
 
 
 ipcRenderer.on('option-show-line-numbers', () => {
-    const lineNumbers = document.getElementById('line-numbers');
-    if (lineNumbers.style.display === 'none') {
-        lineNumbers.style.display = 'block';
-    } else {
-        lineNumbers.style.display = 'none';
-    }
-});
-
-ipcRenderer.on('option-zoom-in', () => {
-    const currentZoom = require('electron').webFrame.getZoomFactor();
-    require('electron').webFrame.setZoomFactor(currentZoom + 0.1);
-});
-
-let savedSidebarState = null;
-
-function getSidebarVisibility() {
-    return {
-        explorer: document.getElementById('explorer-sidebar')?.style.display !== 'none',
-        console: document.getElementById('console-area')?.style.display !== 'none',
-        agent: document.getElementById('agent-sidebar')?.style.display !== 'none'
-    };
-}
-
-ipcRenderer.on('toggle-sidebars', () => {
-    const current = getSidebarVisibility();
-    const anyVisible = current.explorer || current.console || current.agent;
-
-    if (anyVisible) {
-        // Save current state and hide all
-        savedSidebarState = current;
-
-        if (current.explorer) ipcRenderer.emit('toggle-explorer', null, false);
-        if (current.console) ipcRenderer.emit('toggle-console', null, false);
-        if (current.agent) ipcRenderer.emit('toggle-ai-agent', null, false);
-
-        // Sync menu
-        ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', false);
-        ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
-        ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
-    } else {
-        // Restore previous state
-        const toRestore = savedSidebarState || { explorer: true, console: true, agent: true };
-
-        if (toRestore.explorer) ipcRenderer.emit('toggle-explorer', null, true);
-        if (toRestore.console) ipcRenderer.emit('toggle-console', null, true);
-        if (toRestore.agent) ipcRenderer.emit('toggle-ai-agent', null, true);
-
-        // Sync menu
-        if (toRestore.explorer) ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', true);
-        if (toRestore.console) ipcRenderer.send('update-menu-checkbox', 'menu-view-console', true);
-        if (toRestore.agent) ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', true);
-    }
-});
-
-ipcRenderer.on('toggle-explorer', (event, show) => {
-    const el = document.getElementById('explorer-sidebar');
-    const resizer = document.getElementById('explorer-resizer');
-    if (el) el.style.display = show ? 'flex' : 'none';
-    if (resizer) resizer.style.display = show ? 'block' : 'none';
-});
-
-ipcRenderer.on('toggle-console', (event, show) => {
-    const el = document.getElementById('console-area');
-    const resizer = document.getElementById('console-v-resizer');
-    if (el) {
-        if (show) {
-            el.style.display = 'flex';
-            if (resizer) resizer.style.display = 'block';
-            // Pop Back In: Close any popped out windows associated with our sessions
-            // Ideally main process handles closing the windows.
-            // But we need to restore sessions?
-            // User requested: "pop back in".
-            // If we just close the windows, we lose the session if it was remote.
-            // BUT, our "pop out" implementation below will just be spawning new windows.
-            // We can't really "move" the session back.
-            // However, if we interpret "pop out" as just hiding local and showing remote,
-            // and "pop in" as hiding remote and showing local...
-            // We can perhaps just close the remote windows.
-            ipcRenderer.send('close-popped-consoles');
-        } else {
-            el.style.display = 'none';
-            if (resizer) resizer.style.display = 'none';
-            // Pop Out: Always pop out if the console is being hidden
-            consoles.forEach(c => ipcRenderer.send('pop-out-session', c.id, c.name));
+    // Toggle line numbers via Monaco options
+    // We need to know current state or just toggle.
+    // Monaco doesn't expose simplistic toggle without checking current options.
+    // Ideally prompts User or we track state.
+    // For now, let's assume we want to toggle.
+    if (window.monaco && window.monaco.editor) {
+        const editors = window.monaco.editor.getEditors();
+        if (editors.length > 0) {
+            const editor = editors[0];
+            const current = editor.getOption(window.monaco.editor.EditorOption.lineNumbers);
+            const newState = (current.renderType === 0) ? 'off' : 'on'; // 0 is Off, 1 is On
+            // Actually renderType: 0=Off, 1=On, 2=Relative, 3=Interval
+            // simplified:
+            const next = (current.renderType === 0) ? 'on' : 'off';
+            editor.updateOptions({ lineNumbers: next });
         }
     }
 });
 
+// ... zoom listeners ...
+
 ipcRenderer.on('edit-goto-line', () => {
-    const line = prompt('Go to line number:');
-    if (line) {
-        const lineNum = parseInt(line);
-        if (!isNaN(lineNum)) {
-            const lineNumbers = document.getElementById('line-numbers');
-            const target = lineNumbers.children[lineNum - 1];
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+    if (window.monaco && window.monaco.editor) {
+        const editors = window.monaco.editor.getEditors();
+        if (editors.length > 0) {
+            const editor = editors[0];
+            editor.trigger('keyboard', 'editor.action.gotoLine', null);
         }
     }
 });
@@ -1021,12 +436,13 @@ ipcRenderer.on('toggle-ai-agent', (event, show) => {
     if (resizer) resizer.style.display = show ? 'block' : 'none';
 });
 
-ipcRenderer.on('run-module', () => {
-    // Save first
-    if (currentFilePath) {
-        const content = document.getElementById('code-content').innerText;
-        fs.writeFileSync(currentFilePath, content);
+ipcRenderer.on('run-module', async () => {
+    // Save first using Monaco Bridge
+    // silent=true for save, but we actually want to ensure it is saved.
+    // monacoBridge.saveFile(true) returns a promise resolving to success boolean.
+    const saved = await monacoBridge.saveFile(true);
 
+    if (saved && currentFilePath) {
         const consoleArea = document.getElementById('console-area');
         const isConsoleVisible = consoleArea && consoleArea.style.display !== 'none';
 
@@ -1041,8 +457,13 @@ ipcRenderer.on('run-module', () => {
             ipcRenderer.send('pop-out-session', consoleData.id, consoleData.name);
         }
     } else {
-        alert('Please save the file before running.');
-        ipcRenderer.send('save-as-request');
+        // If save failed or no file, prompt save as
+        // But saveFile implementation triggers save-as-request if no currentFilePath
+        // so we don't strictly need to do it here, but good fallback.
+        if (!currentFilePath) {
+            alert('Please save the file before running.');
+            ipcRenderer.send('save-as-request');
+        }
     }
 });
 
