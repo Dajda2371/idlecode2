@@ -305,8 +305,9 @@ consoleInput.addEventListener('keydown', (e) => {
     } else if (e.key === 'ArrowLeft') {
         const start = consoleInput.selectionStart;
         const end = consoleInput.selectionEnd;
+        const val = consoleInput.value;
         // Only move by 4 if no selection and we can move back 4 spaces
-        if (start === end && start >= 4) {
+        if (start === end && start >= 4 && val.substring(start - 4, start) === '    ') {
             e.preventDefault();
             consoleInput.selectionStart = consoleInput.selectionEnd = start - 4;
         }
@@ -315,7 +316,7 @@ consoleInput.addEventListener('keydown', (e) => {
         const end = consoleInput.selectionEnd;
         const val = consoleInput.value;
         // Only move by 4 if no selection and we can move forward 4 spaces
-        if (start === end && start + 4 <= val.length) {
+        if (start === end && start + 4 <= val.length && val.substring(start, start + 4) === '    ') {
             e.preventDefault();
             consoleInput.selectionStart = consoleInput.selectionEnd = start + 4;
         }
