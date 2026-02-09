@@ -417,23 +417,82 @@ function renderCode(content) {
         lineNumbers.scrollTop = codeContent.scrollTop;
     };
 
-    // Simple line number sync (Optimized)
-    codeContent.oninput = () => {
-        const text = codeContent.innerText;
-        const currentCheck = text.split('\n').length;
-        if (currentCheck !== lines.length) {
-            // We can't easily update line numbers one by one without re-rendering?
-            // For now, let's just update the count.
-            lineNumbers.innerHTML = '';
-            for (let i = 1; i <= currentCheck; i++) {
-                const numDiv = document.createElement('div');
-                numDiv.textContent = i;
-                numDiv.style.height = '20px';
-                numDiv.style.lineHeight = '20px';
-                numDiv.className = 'h-[20px] leading-[20px]';
-                lineNumbers.appendChild(numDiv);
+    // Helper to get caret character offset
+    function getCaretCharacterOffsetWithin(element) {
+        let caretOffset = 0;
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(element);
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+            caretOffset = preCaretRange.toString().length;
+        }
+        return caretOffset;
+    }
+
+    // Helper to set caret character offset
+    function setCaretCharacterOffsetWithin(element, offset) {
+        let charCount = 0;
+        const range = document.createRange();
+        range.setStart(element, 0);
+        range.collapse(true);
+        const nodeStack = [element];
+        let node;
+        let foundStart = false;
+        let stop = false;
+
+        while (!stop && (node = nodeStack.pop())) {
+            if (node.nodeType === 3) {
+                const nextCharCount = charCount + node.length;
+                if (!foundStart && offset >= charCount && offset <= nextCharCount) {
+                    range.setStart(node, offset - charCount);
+                    range.setEnd(node, offset - charCount);
+                    stop = true;
+                }
+                charCount = nextCharCount;
+            } else {
+                let i = node.childNodes.length;
+                while (i--) {
+                    nodeStack.push(node.childNodes[i]);
+                }
             }
         }
+
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    // Real-time highlighting and line number sync
+    codeContent.oninput = () => {
+        const offset = getCaretCharacterOffsetWithin(codeContent);
+        const scrollTop = codeContent.scrollTop;
+        const text = codeContent.innerText;
+        const currentLines = text.split('\n');
+
+        // Re-highlight everything
+        let newHtml = '';
+        lineNumbers.innerHTML = '';
+
+        currentLines.forEach((line, index) => {
+            const highlightedLine = hljs.highlight(line || ' ', { language: 'python' }).value;
+            newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
+
+            const numDiv = document.createElement('div');
+            numDiv.textContent = index + 1;
+            numDiv.style.height = '20px';
+            numDiv.style.lineHeight = '20px';
+            numDiv.className = 'h-[20px] leading-[20px]';
+            lineNumbers.appendChild(numDiv);
+        });
+
+        codeContent.innerHTML = newHtml;
+        codeContent.scrollTop = scrollTop;
+        setCaretCharacterOffsetWithin(codeContent, offset);
+
+        // Ensure scroll sync is maintained
+        lineNumbers.scrollTop = codeContent.scrollTop;
     };
 
     codeContent.onkeydown = (e) => {
