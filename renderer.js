@@ -114,6 +114,7 @@ function createTreeItem(dirent, fullPath, parentContainer) {
         iconSpan.textContent = 'keyboard_arrow_right';
     } else {
         if (dirent.name.endsWith('.py')) {
+            iconSpan.className = 'text-gray-400';
             const img = document.createElement('img');
             img.src = ICONS.python;
             img.className = 'w-3.5 h-3.5';
