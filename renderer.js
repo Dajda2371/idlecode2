@@ -644,44 +644,8 @@ codeContent.onkeydown = (e) => {
         }
 
 
+
         document.execCommand('insertText', false, '\n' + indent);
-    } else if (e.key === 'Backspace') {
-        const offsets = getSelectionOffsets(codeContent);
-
-        // Only handle backspace at start of empty line (not first line)
-        if (offsets.startCol === 0 && offsets.startLine > 0 && offsets.startLine === offsets.endLine) {
-            const currentLineDiv = codeContent.children[offsets.startLine];
-
-            if (currentLineDiv) {
-                const lineText = currentLineDiv.innerText.replace(/\n$/, '');
-
-                // Only handle truly empty lines
-                if (lineText === '') {
-                    e.preventDefault();
-
-                    // Get previous line info before removing
-                    const prevLineDiv = codeContent.children[offsets.startLine - 1];
-                    const prevText = prevLineDiv ? prevLineDiv.innerText.replace(/\n$/, '') : '';
-
-                    // Remove the empty line
-                    currentLineDiv.remove();
-
-                    // Position cursor at end of previous line
-                    setTimeout(() => {
-                        try {
-                            setSelectionOffsets(codeContent, {
-                                startLine: offsets.startLine - 1,
-                                startCol: prevText.length,
-                                endLine: offsets.startLine - 1,
-                                endCol: prevText.length
-                            });
-                        } catch (err) {
-                            console.error('Cursor positioning failed:', err);
-                        }
-                    }, 0);
-                }
-            }
-        }
     }
 };
 
