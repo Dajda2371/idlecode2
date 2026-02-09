@@ -198,13 +198,8 @@ consoleInput.addEventListener('input', () => {
     }
 });
 
-// Kill session on window close
-window.addEventListener('beforeunload', () => {
-    if (currentSessionId) {
-        // Send request to remove session entirely
-        ipcRenderer.send('session-close', currentSessionId);
-    }
-});
+// Note: session-close is handled by the user explicitly or by the main window.
+// Listening windows (like this pop-out) should not kill the session on close.
 
 clearConsoleBtn.addEventListener('click', () => {
     consoleOutput.innerHTML = '<div class="text-gray-500 mb-1">Python Interactive Shell Ready.</div>';
