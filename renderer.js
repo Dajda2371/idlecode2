@@ -919,13 +919,13 @@ function spawnConsoleProcess(consoleData, filePath = null) {
     // If resetting existing console
     if (filePath) {
         // Just kill process to restart, don't remove session from UI
-        ipcRenderer.send('session-kill', consoleData.id);
+        // ipcRenderer.send('session-kill', consoleData.id);
 
         consoleData.name = `Run: ${path.basename(filePath)}`;
         consoleData.filePath = filePath;
         // The === RESTART === line is now handled by main.js and sent via session-output meta
 
-        ipcRenderer.send('session-create', consoleData.id, filePath, consoleData.name);
+        ipcRenderer.send('session-create', consoleData.id, filePath, consoleData.name, true); // force=true
         ipcRenderer.send('session-attach', consoleData.id);
 
         if (activeConsoleId === consoleData.id) {

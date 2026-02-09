@@ -402,14 +402,18 @@ function broadcastToSession(sessionId, channel, ...args) {
     });
 }
 
-ipcMain.on('session-create', (event, sessionId, filePath, name) => {
+ipcMain.on('session-create', (event, sessionId, filePath, name, force) => {
     let session = sessions.get(sessionId);
     let isRestart = false;
 
     if (session) {
         if (session.process && !session.process.killed) {
-            console.log(`Session ${sessionId} already active, skipping create.`);
-            return;
+            if (force) {
+                try { session.process.kill(); } catch (e) { console.error(e); }
+            } else {
+                console.log(`Session ${sessionId} already active, skipping create.`);
+                return;
+            }
         }
         // Restarting: Reset existing session state but preserve listeners
         console.log(`Session ${sessionId} exists but process is dead. Restarting...`);
