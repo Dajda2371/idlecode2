@@ -531,15 +531,19 @@ ipcRenderer.on('option-zoom-in', () => {
 });
 
 ipcRenderer.on('toggle-explorer', (event, show) => {
-    const el = document.querySelector('aside.w-\\[260px\\]');
+    const el = document.getElementById('explorer-sidebar');
+    const resizer = document.getElementById('explorer-resizer');
     if (el) el.style.display = show ? 'flex' : 'none';
+    if (resizer) resizer.style.display = show ? 'block' : 'none';
 });
 
 ipcRenderer.on('toggle-console', (event, show) => {
     const el = document.getElementById('console-area');
+    const resizer = document.getElementById('console-v-resizer');
     if (el) {
         if (show) {
             el.style.display = 'flex';
+            if (resizer) resizer.style.display = 'block';
             // Pop Back In: Close any popped out windows associated with our sessions
             // Ideally main process handles closing the windows.
             // But we need to restore sessions?
@@ -553,6 +557,7 @@ ipcRenderer.on('toggle-console', (event, show) => {
             ipcRenderer.send('close-popped-consoles');
         } else {
             el.style.display = 'none';
+            if (resizer) resizer.style.display = 'none';
             // Pop Out: Open windows for active shells
             consoles.forEach(c => {
                 // Pop Out existing session
@@ -591,37 +596,10 @@ ipcRenderer.on('option-zoom-out', () => { // Not in menu but good helper?
 
 
 ipcRenderer.on('toggle-ai-agent', (event, show) => {
-    // Assuming we have an AI Agent sidebar or panel.
-    // Let's create one or toggle existing if we had it.
-    // Based on previous code, we might not have a dedicated AI panel yet except 'console-area' or 'explorer'.
-    // Let's assume we want a right sidebar or similar.
-    let aiPanel = document.getElementById('ai-panel');
-    if (!aiPanel) {
-        // Create it if missing (stub)
-        aiPanel = document.createElement('div');
-        aiPanel.id = 'ai-panel';
-        aiPanel.className = 'w-[300px] border-l border-gray-200 bg-gray-50 flex flex-col hidden';
-        aiPanel.innerHTML = `
-            <div class="bg-gray-100 border-b border-gray-300 px-2 py-1 flex justify-between items-center font-bold text-xs">
-                <span>AI Agent</span>
-                <button onclick="document.getElementById('ai-panel').style.display='none'">X</button>
-            </div>
-            <div class="p-2 flex-1 overflow-auto text-xs">
-                AI Agent is ready.
-            </div>
-        `;
-        document.querySelector('main').appendChild(aiPanel);
-        // Adjust main flex direction? It is flex-row?
-        // <main> is flex-col. So appending AI panel at bottom? 
-        // We want it side-by-side with editor?
-        // Parent of <main> is <body> which is flex-col.
-        // <div class="flex-1 flex overflow-hidden"> contains <aside> and <main>.
-        // We should append to that container.
-        document.querySelector('.h-screen > div.flex-1').appendChild(aiPanel);
-    }
-
-    if (show) aiPanel.style.display = 'flex';
-    else aiPanel.style.display = 'none';
+    const el = document.getElementById('agent-sidebar');
+    const resizer = document.getElementById('agent-resizer');
+    if (el) el.style.display = show ? 'flex' : 'none';
+    if (resizer) resizer.style.display = show ? 'block' : 'none';
 });
 
 ipcRenderer.on('run-module', () => {
@@ -693,8 +671,10 @@ if (hideConsoleBtn) {
     hideConsoleBtn.onclick = () => {
         // Hide via IPC to sync menu state
         const consoleArea = document.getElementById('console-area');
+        const resizer = document.getElementById('console-v-resizer');
         if (consoleArea) {
             consoleArea.style.display = 'none';
+            if (resizer) resizer.style.display = 'none';
             // Sync menu state
             ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
 
@@ -1434,3 +1414,56 @@ ipcRenderer.on('menu-show-completions', () => {
 });
 
 
+
+// --- Resizer Logic ---
+
+function setupResizer(resizerId, sidebarId, direction, inverse = false) {
+    const resizer = document.getElementById(resizerId);
+    const sidebar = document.getElementById(sidebarId);
+    if (!resizer || !sidebar) return;
+
+    let startPos, startSize;
+
+    resizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        resizer.classList.add('dragging');
+        document.body.style.cursor = direction === 'h' ? 'col-resize' : 'row-resize';
+
+        startPos = direction === 'h' ? e.clientX : e.clientY;
+        startSize = direction === 'h' ? sidebar.offsetWidth : sidebar.offsetHeight;
+
+        const onMouseMove = (e) => {
+            const currentPos = direction === 'h' ? e.clientX : e.clientY;
+            let delta = currentPos - startPos;
+            if (inverse) delta = -delta;
+
+            const newSize = startSize + delta;
+
+            // Min/Max constraints
+            const minSize = 50;
+            if (newSize < minSize) return;
+
+            if (direction === 'h') {
+                sidebar.style.width = `${newSize}px`;
+            } else {
+                sidebar.style.height = `${newSize}px`;
+            }
+        };
+
+        const onMouseUp = () => {
+            resizer.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+}
+
+// Initialize all resizers
+setupResizer('explorer-resizer', 'explorer-sidebar', 'h');
+setupResizer('agent-resizer', 'agent-sidebar', 'h', true);
+setupResizer('console-v-resizer', 'console-area', 'v', true);
+setupResizer('shell-sessions-resizer', 'shell-sessions-sidebar', 'h', true);

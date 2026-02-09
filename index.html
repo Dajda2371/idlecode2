@@ -87,6 +87,28 @@
             @apply px-4 py-1 text-[13px] hover:bg-blue-600 hover:text-white cursor-pointer block;
         }
 
+        .h-resizer {
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            transition: background 0.2s;
+            z-index: 40;
+            flex-shrink: 0;
+        }
+        .h-resizer:hover, .h-resizer.dragging {
+            background: rgba(0, 112, 243, 0.3);
+        }
+        .v-resizer {
+            height: 5px;
+            cursor: row-resize;
+            background: transparent;
+            transition: background 0.2s;
+            z-index: 40;
+            flex-shrink: 0;
+        }
+        .v-resizer:hover, .v-resizer.dragging {
+            background: rgba(0, 112, 243, 0.3);
+        }
     </style>
 </head>
 
@@ -94,8 +116,8 @@
 
 
     <div class="flex-1 flex overflow-hidden">
-        <aside
-            class="w-[260px] bg-[var(--explorer-bg)] border-r border-[var(--sidebar-border)] flex flex-col font-sans select-none">
+        <aside id="explorer-sidebar"
+            class="w-[260px] bg-[var(--explorer-bg)] border-r border-[var(--sidebar-border)] flex flex-col font-sans select-none shrink-0">
             <div class="px-3 py-2 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined">close</span>
@@ -106,6 +128,7 @@
             <div class="overflow-y-auto flex-1" id="file-tree">
             </div>
         </aside>
+        <div id="explorer-resizer" class="h-resizer"></div>
         <main class="flex-1 flex flex-col bg-white border-r border-gray-200 overflow-hidden">
             <!-- Editor Area -->
             <div class="flex-1 flex overflow-auto min-h-[200px]" id="editor-area">
@@ -223,6 +246,7 @@
                 </div>
             </div>
 
+            <div id="console-v-resizer" class="v-resizer"></div>
             <!-- Console Area -->
             <div class="h-[250px] flex border-t border-gray-300 bg-white font-mono text-[13px]" id="console-area">
 
@@ -255,8 +279,10 @@
                     </div>
                 </div>
 
+                <div id="shell-sessions-resizer" class="h-resizer"></div>
                 <!-- Console List Sidebar (Right) -->
-                <div class="w-[180px] border-l border-gray-200 flex flex-col bg-gray-50 text-[12px] font-sans shrink-0">
+                <div id="shell-sessions-sidebar"
+                    class="w-[180px] border-l border-gray-200 flex flex-col bg-gray-50 text-[12px] font-sans shrink-0">
                     <div
                         class="flex items-center justify-between px-2 py-1 border-b border-gray-200 bg-gray-100 h-[25px]">
                         <span class="font-bold text-gray-500 text-[10px] tracking-wider">SHELL SESSIONS</span>
@@ -272,7 +298,9 @@
                 </div>
             </div>
         </main>
-        <aside class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans">
+        <div id="agent-resizer" class="h-resizer"></div>
+        <aside id="agent-sidebar"
+            class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans shrink-0">
             <div class="px-4 py-2 flex items-center justify-between border-b border-[var(--sidebar-border)]">
                 <div class="flex items-center gap-4">
                     <span
