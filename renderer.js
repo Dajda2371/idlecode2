@@ -440,10 +440,22 @@ function renderCode(content) {
     function setSelectionOffsets(element, start, end) {
         let charCount = 0;
         const range = document.createRange();
+        range.setStart(element, 0);
+        range.collapse(true);
         const nodeStack = [element];
         let node;
         let startSet = false;
         let endSet = false;
+
+        // If target offsets are 0, we can start at the very beginning
+        if (start === 0) {
+            range.setStart(element, 0);
+            startSet = true;
+        }
+        if (end === 0) {
+            range.setEnd(element, 0);
+            endSet = true;
+        }
 
         while ((node = nodeStack.pop())) {
             if (node.nodeType === 3) {
@@ -458,13 +470,22 @@ function renderCode(content) {
                 }
                 if (startSet && endSet) break;
                 charCount = nextCharCount;
-            } else {
+            } else if (node.nodeType === 1) {
+                // If it's an empty element (like <br>), we might still need to set position
+                if (node.childNodes.length === 0 && charCount === start && !startSet) {
+                    // This handles empty divs/brs
+                }
+
                 let i = node.childNodes.length;
                 while (i--) {
                     nodeStack.push(node.childNodes[i]);
                 }
             }
         }
+
+        // Final fallback to end of container if not set
+        if (!startSet) range.setStart(element, element.childNodes.length);
+        if (!endSet) range.setEnd(element, element.childNodes.length);
 
         const selection = window.getSelection();
         selection.removeAllRanges();
@@ -947,7 +968,7 @@ ipcRenderer.on('session-history', (event, sessionId, historyArr, cmdHistory, dra
 
     // Restore draft
     if (activeConsoleId === sessionId && draft) {
-        consoleInput.value = draft;
+        consoleInput.innerHTML = hljs.highlight(draft, { language: 'python' }).value;
     }
 
     if (activeConsoleId === sessionId) {
@@ -962,7 +983,7 @@ ipcRenderer.on('session-input-draft', (event, sessionId, draft) => {
 
     consoleData.inputDraft = draft;
     if (activeConsoleId === sessionId) {
-        consoleInput.value = draft;
+        consoleInput.innerHTML = draft ? hljs.highlight(draft, { language: 'python' }).value : '';
     }
 });
 
@@ -1031,9 +1052,11 @@ function switchConsole(id) {
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
 
     // Set text and highlight
-    consoleInput.innerText = target.inputDraft || '';
-    if (consoleInput.innerText) {
-        consoleInput.innerHTML = hljs.highlight(consoleInput.innerText, { language: 'python' }).value || '<br>';
+    const draft = target.inputDraft || '';
+    if (draft) {
+        consoleInput.innerHTML = hljs.highlight(draft, { language: 'python' }).value;
+    } else {
+        consoleInput.innerHTML = '';
     }
 
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
@@ -1165,7 +1188,8 @@ consoleInput.addEventListener('keydown', (e) => {
         e.preventDefault();
         if (!activeConsoleId || !currentConsole) return;
 
-        const command = consoleInput.innerText;
+        // Use textContent for the actual command string to avoid trailing newlines from innerText
+        const command = consoleInput.textContent || '';
         const isPromptHidden = consolePrompt && consolePrompt.style.display === 'none';
         const isInputResponse = currentConsole.waitingForInput || isPromptHidden;
 
@@ -1198,14 +1222,14 @@ consoleInput.addEventListener('keydown', (e) => {
                 consolePrompt.innerText = currentConsole.promptText || '>>>';
             }
 
-            consoleInput.innerText = '';
+            consoleInput.innerHTML = '';
             currentConsole.inputDraft = '';
             ipcRenderer.send('session-input-draft', currentConsole.id, '');
         } else {
             ipcRenderer.send('session-input', currentConsole.id, command, false);
             if (consolePrompt) consolePrompt.style.display = 'none';
 
-            consoleInput.innerText = '';
+            consoleInput.innerHTML = '';
             currentConsole.inputDraft = '';
             ipcRenderer.send('session-input-draft', currentConsole.id, '');
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
@@ -1214,8 +1238,7 @@ consoleInput.addEventListener('keydown', (e) => {
         if (currentConsole && currentConsole.historyIndex > 0) {
             currentConsole.historyIndex--;
             const newText = currentConsole.commandHistory[currentConsole.historyIndex] || '';
-            consoleInput.innerText = newText;
-            consoleInput.innerHTML = hljs.highlight(newText, { language: 'python' }).value || '<br>';
+            consoleInput.innerHTML = newText ? hljs.highlight(newText, { language: 'python' }).value : '';
             setSelectionOffsets(consoleInput, newText.length, newText.length);
         }
     } else if (e.key === 'ArrowDown') {
@@ -1223,15 +1246,15 @@ consoleInput.addEventListener('keydown', (e) => {
             if (currentConsole.historyIndex < currentConsole.commandHistory.length - 1) {
                 currentConsole.historyIndex++;
                 const newText = currentConsole.commandHistory[currentConsole.historyIndex] || '';
-                consoleInput.innerText = newText;
-                consoleInput.innerHTML = hljs.highlight(newText, { language: 'python' }).value || '<br>';
+                consoleInput.innerHTML = newText ? hljs.highlight(newText, { language: 'python' }).value : '';
                 setSelectionOffsets(consoleInput, newText.length, newText.length);
             } else {
                 currentConsole.historyIndex = currentConsole.commandHistory.length;
-                consoleInput.innerText = '';
+                consoleInput.innerHTML = '';
             }
         }
-    } else if (e.key === 'Tab') {
+    }
+    else if (e.key === 'Tab') {
         e.preventDefault();
         const newVal = val.substring(0, start) + "    " + val.substring(end);
         consoleInput.innerText = newVal;
@@ -1263,12 +1286,16 @@ consoleInput.addEventListener('input', () => {
         const currentConsole = consoles.find(c => c.id === activeConsoleId);
         if (currentConsole) {
             const { start, end } = getSelectionOffsets(consoleInput);
-            const text = consoleInput.innerText;
+            const text = consoleInput.textContent || '';
             currentConsole.inputDraft = text;
             ipcRenderer.send('session-input-draft', currentConsole.id, text);
 
             // Highlight
-            consoleInput.innerHTML = hljs.highlight(text, { language: 'python' }).value || '<br>';
+            if (text === '') {
+                consoleInput.innerHTML = '';
+            } else {
+                consoleInput.innerHTML = hljs.highlight(text, { language: 'python' }).value;
+            }
             setSelectionOffsets(consoleInput, start, end);
         }
     }
