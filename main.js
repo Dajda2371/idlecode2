@@ -240,6 +240,7 @@ function createWindow() {
                     label: 'AI Agent',
                     type: 'checkbox',
                     checked: true,
+                    id: 'menu-view-agent',
                     click: (menuItem) => win.webContents.send('toggle-ai-agent', menuItem.checked)
                 }
             ]

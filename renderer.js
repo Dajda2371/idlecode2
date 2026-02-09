@@ -1863,3 +1863,23 @@ if (chatWebview) {
     });
 }
 
+const closeAgentBtn = document.getElementById('close-agent-btn');
+const agentSidebar = document.getElementById('agent-sidebar');
+const agentResizer = document.getElementById('agent-resizer');
+
+if (closeAgentBtn) {
+    closeAgentBtn.addEventListener('click', () => {
+        if (agentSidebar) agentSidebar.style.display = 'none';
+        if (agentResizer) agentResizer.style.display = 'none';
+
+        // Update the system menu checkbox
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
+    });
+}
+
+// Ensure the menu toggle also works as expected (it likely already does via main.js sending toggle-ai-agent)
+ipcRenderer.on('toggle-ai-agent', (event, visible) => {
+    if (agentSidebar) agentSidebar.style.display = visible ? 'flex' : 'none';
+    if (agentResizer) agentResizer.style.display = visible ? 'flex' : 'none';
+});
+

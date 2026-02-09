@@ -305,7 +305,11 @@
         </main>
         <div id="agent-resizer" class="h-resizer"></div>
         <aside id="agent-sidebar"
-            class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans shrink-0">
+            class="w-[380px] bg-[var(--sidebar-bg)] border-l border-[var(--sidebar-border)] flex flex-col font-sans shrink-0 relative">
+            <button id="close-agent-btn"
+                class="absolute top-2 right-2 z-50 bg-gray-200 hover:bg-gray-300 rounded-full w-6 h-6 flex items-center justify-center text-gray-600 border border-gray-300">
+                <span class="material-symbols-outlined !text-[16px]">close</span>
+            </button>
             <div class="flex-1">
                 <webview id="chatgpt-webview" src="https://chatgpt.com" class="w-full h-full"
                     partition="persist:agent-session" allowpopups
