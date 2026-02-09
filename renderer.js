@@ -638,14 +638,28 @@ codeContent.onkeydown = (e) => {
         const match = textBeforeCaret.match(/^ */);
         let indent = match ? match[0] : '';
 
+
         // If part of line before caret ends with colon, increase indent
         if (textBeforeCaret.trim().endsWith(':')) {
             indent += '    ';
         }
 
-
-
         document.execCommand('insertText', false, '\n' + indent);
+    } else if (e.key === 'Backspace') {
+        const offsets = getSelectionOffsets(codeContent);
+
+        if (offsets.startCol === 0 && offsets.startLine > 0 && offsets.startLine === offsets.endLine) {
+            e.preventDefault();
+
+            const prevLine = codeContent.children[offsets.startLine - 1];
+            const currentLine = codeContent.children[offsets.startLine];
+
+            if (prevLine && currentLine) {
+                const currentHTML = currentLine.innerHTML;
+                prevLine.innerHTML += currentHTML;
+                currentLine.remove();
+            }
+        }
     }
 };
 
