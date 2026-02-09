@@ -930,7 +930,10 @@ function switchConsole(id) {
     if (activeConsoleTitle) activeConsoleTitle.textContent = target.name;
 
     // Show input area
-    if (consoleInputArea) consoleInputArea.style.display = 'flex';
+    if (consoleInputArea) {
+        consoleInputArea.classList.remove('hidden');
+        consoleInputArea.style.display = 'flex';
+    }
 
     renderConsoleList();
     consoleInput.focus();
@@ -1274,21 +1277,30 @@ consoleInput.addEventListener('keydown', (e) => {
     }
 });
 
+// --- Initialization ---
+
 if (addConsoleBtn) {
-    addConsoleBtn.addEventListener('click', () => {
+    addConsoleBtn.onclick = () => { // Use onclick for simplicity/robustness
+        console.log('Adding new console...');
         createConsole();
-    });
+    };
+} else {
+    console.error('Add Console Button not found!');
 }
 
-// Start with empty state
 renderConsoleList();
-if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
-if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
-consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
-if (consoleInputArea) consoleInputArea.style.display = 'none';
 
-if (Object.keys(consoles).length === 0) {
-    if (typeof closeActiveConsoleBtn !== 'undefined' && closeActiveConsoleBtn) closeActiveConsoleBtn.classList.add('hidden');
+consoleOutput.innerHTML = '<div class="text-gray-400 p-2 italic">No active shell. Click + to start one.</div>';
+if (activeConsoleTitle) activeConsoleTitle.textContent = 'No Active Console';
+
+// Explicitly hide input area on init if no consoles
+if (consoles.length === 0) {
+    if (consoleInputArea) {
+        consoleInputArea.style.setProperty('display', 'none', 'important');
+    }
+    if (typeof closeActiveConsoleBtn !== 'undefined' && closeActiveConsoleBtn) {
+        closeActiveConsoleBtn.classList.add('hidden');
+    }
 }
 
 const popOutBtn = document.getElementById('pop-out-console-btn');

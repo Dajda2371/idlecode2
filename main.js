@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const setupWebViewer = require('./ElectronWebViewer/integrate');
 
 let mainWindow = null;
+let webViewer = null;
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -22,7 +23,7 @@ function createWindow() {
     win.loadFile('index.html')
 
     // Setup web viewer - that's it! Just one line to enable streaming
-    setupWebViewer(win, { port: 8080 });
+    webViewer = setupWebViewer(win, { port: 8080 });
 
     const template = [
         {
@@ -340,6 +341,9 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+    if (webViewer) {
+        webViewer.shutdown();
+    }
     if (process.platform !== 'darwin') {
         app.quit()
     }
