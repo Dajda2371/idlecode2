@@ -493,6 +493,9 @@ function renderCode(content) {
 
         // Ensure scroll sync is maintained
         lineNumbers.scrollTop = codeContent.scrollTop;
+
+        // Autosave
+        debouncedSave();
     };
 
     codeContent.onkeydown = (e) => {
@@ -508,25 +511,39 @@ function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-ipcRenderer.on('save-file', () => {
+function saveFile(silent = false) {
     if (currentFilePath) {
         const content = document.getElementById('code-content').innerText;
         fs.writeFile(currentFilePath, content, (err) => {
             if (err) {
-                alert(`Error saving file: ${err.message}`);
+                if (!silent) alert(`Error saving file: ${err.message}`);
                 console.error(err);
                 return;
             }
-            // Optional: flash feedback
-            const title = document.title;
-            document.title = title.replace(' *', '') + ' (Saved)';
-            setTimeout(() => document.title = title.replace(' *', ''), 2000);
+            if (!silent) {
+                // Optional: flash feedback
+                const title = document.title;
+                document.title = title.replace(' *', '') + ' (Saved)';
+                setTimeout(() => document.title = title.replace(' *', ''), 2000);
+            }
         });
-    } else {
+    } else if (!silent) {
         // Trigger Save As (handled in main usually, but we can trigger it here too or send back)
-        ipcRenderer.send('save-as-request'); // We need to add this to main
+        ipcRenderer.send('save-as-request');
     }
+}
+
+ipcRenderer.on('save-file', () => {
+    saveFile(false);
 });
+
+let autosaveTimeout = null;
+function debouncedSave() {
+    if (autosaveTimeout) clearTimeout(autosaveTimeout);
+    autosaveTimeout = setTimeout(() => {
+        saveFile(true);
+    }, 1000); // 1 second debounce
+}
 
 
 // --- Menu Action Listeners ---
