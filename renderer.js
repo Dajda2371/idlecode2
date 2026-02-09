@@ -646,43 +646,39 @@ codeContent.onkeydown = (e) => {
 
         document.execCommand('insertText', false, '\n' + indent);
     } else if (e.key === 'Backspace') {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-
-        const range = selection.getRangeAt(0);
         const offsets = getSelectionOffsets(codeContent);
 
-        if (offsets.startCol === 0 && offsets.startLine > 0 && range.collapsed) {
+        // Only handle backspace at start of empty line (not first line)
+        if (offsets.startCol === 0 && offsets.startLine > 0 && offsets.startLine === offsets.endLine) {
             const currentLineDiv = codeContent.children[offsets.startLine];
 
-            if (currentLineDiv && currentLineDiv.innerText.replace(/\n$/, '') === '') {
-                e.preventDefault();
+            if (currentLineDiv) {
+                const lineText = currentLineDiv.innerText.replace(/\n$/, '');
 
-                const prevLineDiv = codeContent.children[offsets.startLine - 1];
-                currentLineDiv.remove();
+                // Only handle truly empty lines
+                if (lineText === '') {
+                    e.preventDefault();
 
-                if (prevLineDiv) {
-                    const newRange = document.createRange();
-                    const newSelection = window.getSelection();
+                    // Get previous line info before removing
+                    const prevLineDiv = codeContent.children[offsets.startLine - 1];
+                    const prevText = prevLineDiv ? prevLineDiv.innerText.replace(/\n$/, '') : '';
 
-                    const walker = document.createTreeWalker(prevLineDiv, NodeFilter.SHOW_TEXT, null);
-                    let lastTextNode = null;
-                    while (walker.nextNode()) lastTextNode = walker.currentNode;
+                    // Remove the empty line
+                    currentLineDiv.remove();
 
-                    let targetNode = prevLineDiv, targetOffset = 0;
-                    if (lastTextNode) {
-                        targetNode = lastTextNode;
-                        targetOffset = lastTextNode.length;
-                    } else if (prevLineDiv.childNodes.length > 0) {
-                        targetOffset = prevLineDiv.childNodes.length;
-                    }
-
-                    try {
-                        newRange.setStart(targetNode, targetOffset);
-                        newRange.collapse(true);
-                        newSelection.removeAllRanges();
-                        newSelection.addRange(newRange);
-                    } catch (err) { }
+                    // Position cursor at end of previous line
+                    setTimeout(() => {
+                        try {
+                            setSelectionOffsets(codeContent, {
+                                startLine: offsets.startLine - 1,
+                                startCol: prevText.length,
+                                endLine: offsets.startLine - 1,
+                                endCol: prevText.length
+                            });
+                        } catch (err) {
+                            console.error('Cursor positioning failed:', err);
+                        }
+                    }, 0);
                 }
             }
         }
