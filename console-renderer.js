@@ -25,8 +25,14 @@ ipcRenderer.on('run-file', (event, filePath) => {
 });
 
 // Receive full state on attach
-ipcRenderer.on('session-history', (event, sessionId, history, cmdHistory, draft) => {
+ipcRenderer.on('session-history', (event, sessionId, history, cmdHistory, draft, name) => {
     if (sessionId !== currentSessionId) return;
+
+    // 0. Update Title
+    const titleEl = document.getElementById('console-title');
+    if (titleEl && name) {
+        titleEl.innerText = name;
+    }
 
     // 1. Render Output History
     consoleOutput.innerHTML = '';

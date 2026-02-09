@@ -374,7 +374,7 @@ function broadcastToSession(sessionId, channel, ...args) {
     });
 }
 
-ipcMain.on('session-create', (event, sessionId, filePath) => {
+ipcMain.on('session-create', (event, sessionId, filePath, name) => {
     let session = sessions.get(sessionId);
     let isRestart = false;
 
@@ -393,10 +393,12 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
         session.waitingForInput = false;
         session.lastPrompt = '>>>';
         session.lastPromptType = 'standard';
+        if (name) session.name = name;
         isRestart = true;
     } else {
         session = {
             id: sessionId,
+            name: name || (filePath ? `Run: ${path.basename(filePath)}` : `Shell ${sessionId}`),
             history: [],
             commandHistory: [],
             inputDraft: '',
@@ -410,20 +412,26 @@ ipcMain.on('session-create', (event, sessionId, filePath) => {
         sessions.set(sessionId, session);
     }
 
-    // Spawn Python Process
-    let pythonPath = 'python3'; // Default
-    if (process.platform === 'win32') pythonPath = 'python';
+    // Standard IDLE behavior: Run file and then stay interactive
+    // We use -i to ensure it remains interactive after running the script
+    const args = ['-u', '-i'];
+    if (filePath) {
+        args.push(filePath);
+        // Add a restart notification to history so all listeners see it
+        const restartEntry = { type: 'meta', text: `\n=== RESTART: ${filePath} ===\n` };
+        session.history.push(restartEntry);
+    }
 
-    const args = ['-u']; // Unbuffered
-    if (filePath) args.push(filePath);
-    else args.push('-i'); // Interactive mode if no file
+    // Spawn Python Process
+    let pythonPath = 'python3';
+    if (process.platform === 'win32') pythonPath = 'python';
 
     const pyProcess = spawn(pythonPath, args);
     session.process = pyProcess;
 
     if (isRestart) {
         // Notify all existing listeners about the reset/new history
-        broadcastToSession(sessionId, 'session-history', [], [], '');
+        broadcastToSession(sessionId, 'session-history', session.history, session.commandHistory, session.inputDraft, session.name);
     }
 
     // Handle Output
@@ -577,7 +585,7 @@ ipcMain.on('session-attach', (event, sessionId) => {
     if (session) {
         session.listeners.add(event.sender);
         // Send history upon attach
-        event.sender.send('session-history', sessionId, session.history, session.commandHistory, session.inputDraft);
+        event.sender.send('session-history', sessionId, session.history, session.commandHistory, session.inputDraft, session.name);
 
         // Remove listener when window closes (sender destroyed)
         event.sender.once('destroyed', () => {

@@ -827,7 +827,7 @@ function createConsole(name = null, filePath = null) {
     consoles.push(consoleData);
 
     // Request Main to create session
-    ipcRenderer.send('session-create', id, filePath);
+    ipcRenderer.send('session-create', id, filePath, consoleData.name);
     ipcRenderer.send('session-attach', id);
 
     // Switch to new console immediately
@@ -845,9 +845,9 @@ function spawnConsoleProcess(consoleData, filePath = null) {
 
         consoleData.name = `Run: ${path.basename(filePath)}`;
         consoleData.filePath = filePath;
-        consoleData.history += `<div class="text-gray-500 mb-1 mt-2">=== RESTART: ${filePath} ===</div>`;
+        // The === RESTART === line is now handled by main.js and sent via session-output meta
 
-        ipcRenderer.send('session-create', consoleData.id, filePath);
+        ipcRenderer.send('session-create', consoleData.id, filePath, consoleData.name);
         ipcRenderer.send('session-attach', consoleData.id);
 
         if (activeConsoleId === consoleData.id) {
