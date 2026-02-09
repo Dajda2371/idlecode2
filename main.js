@@ -192,6 +192,7 @@ function createWindow() {
                 },
                 {
                     label: 'New Shell Window',
+                    accelerator: 'CmdOrCtrl+Shift+N',
                     click: () => win.webContents.send('menu-new-console')
                 }
             ]

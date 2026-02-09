@@ -707,7 +707,8 @@ ipcRenderer.on('run-module', () => {
 });
 
 ipcRenderer.on('menu-new-console', () => {
-    ipcRenderer.send('new-console-window');
+    console.log('Creating new console via menu/IPC');
+    createConsole();
 });
 
 
@@ -896,6 +897,12 @@ function createConsole(name = null, filePath = null) {
     renderConsoleList();
     return consoleData;
 }
+
+// Expose globally RIGHT AFTER definition for remote control/debugging  
+window.createNewConsole = function () {
+    console.log('window.createNewConsole called!');
+    return createConsole();
+};
 
 // Replaced spawnConsoleProcess with IPC
 function spawnConsoleProcess(consoleData, filePath = null) {
@@ -1280,10 +1287,15 @@ consoleInput.addEventListener('keydown', (e) => {
 // --- Initialization ---
 
 if (addConsoleBtn) {
-    addConsoleBtn.onclick = () => { // Use onclick for simplicity/robustness
-        console.log('Adding new console...');
+    addConsoleBtn.onclick = (e) => { // Use onclick for simplicity/robustness
+        console.log('Add console button clicked!', e);
         createConsole();
     };
+
+    // Also add event listener as backup
+    addConsoleBtn.addEventListener('click', (e) => {
+        console.log('Add console via addEventListener', e);
+    });
 } else {
     console.error('Add Console Button not found!');
 }
