@@ -417,39 +417,46 @@ function renderCode(content) {
         lineNumbers.scrollTop = codeContent.scrollTop;
     };
 
-    // Helper to get caret character offset
-    function getCaretCharacterOffsetWithin(element) {
-        let caretOffset = 0;
+    // Helper to get selection character offsets
+    function getSelectionOffsets(element) {
         const selection = window.getSelection();
-        if (selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            const preCaretRange = range.cloneRange();
-            preCaretRange.selectNodeContents(element);
-            preCaretRange.setEnd(range.endContainer, range.endOffset);
-            caretOffset = preCaretRange.toString().length;
-        }
-        return caretOffset;
+        if (selection.rangeCount === 0) return { start: 0, end: 0 };
+        const range = selection.getRangeAt(0);
+
+        const preStartRange = range.cloneRange();
+        preStartRange.selectNodeContents(element);
+        preStartRange.setEnd(range.startContainer, range.startOffset);
+        const start = preStartRange.toString().length;
+
+        const preEndRange = range.cloneRange();
+        preEndRange.selectNodeContents(element);
+        preEndRange.setEnd(range.endContainer, range.endOffset);
+        const end = preEndRange.toString().length;
+
+        return { start, end };
     }
 
-    // Helper to set caret character offset
-    function setCaretCharacterOffsetWithin(element, offset) {
+    // Helper to set selection character offsets
+    function setSelectionOffsets(element, start, end) {
         let charCount = 0;
         const range = document.createRange();
-        range.setStart(element, 0);
-        range.collapse(true);
         const nodeStack = [element];
         let node;
-        let foundStart = false;
-        let stop = false;
+        let startSet = false;
+        let endSet = false;
 
-        while (!stop && (node = nodeStack.pop())) {
+        while ((node = nodeStack.pop())) {
             if (node.nodeType === 3) {
                 const nextCharCount = charCount + node.length;
-                if (!foundStart && offset >= charCount && offset <= nextCharCount) {
-                    range.setStart(node, offset - charCount);
-                    range.setEnd(node, offset - charCount);
-                    stop = true;
+                if (!startSet && start >= charCount && start <= nextCharCount) {
+                    range.setStart(node, start - charCount);
+                    startSet = true;
                 }
+                if (!endSet && end >= charCount && end <= nextCharCount) {
+                    range.setEnd(node, end - charCount);
+                    endSet = true;
+                }
+                if (startSet && endSet) break;
                 charCount = nextCharCount;
             } else {
                 let i = node.childNodes.length;
@@ -464,18 +471,39 @@ function renderCode(content) {
         selection.addRange(range);
     }
 
+    // Backwards compatibility for existing code
+    function getCaretCharacterOffsetWithin(element) {
+        return getSelectionOffsets(element).end;
+    }
+    function setCaretCharacterOffsetWithin(element, offset) {
+        setSelectionOffsets(element, offset, offset);
+    }
+
     // Real-time highlighting and line number sync
     codeContent.oninput = () => {
-        const offset = getCaretCharacterOffsetWithin(codeContent);
+        const { start, end } = getSelectionOffsets(codeContent);
         const scrollTop = codeContent.scrollTop;
         const text = codeContent.innerText;
         const currentLines = text.split('\n');
 
         // Re-highlight everything
+        renderLines(currentLines);
+
+        codeContent.scrollTop = scrollTop;
+        setSelectionOffsets(codeContent, start, end);
+
+        // Ensure scroll sync is maintained
+        lineNumbers.scrollTop = codeContent.scrollTop;
+
+        // Autosave
+        debouncedSave();
+    };
+
+    function renderLines(lines) {
         let newHtml = '';
         lineNumbers.innerHTML = '';
 
-        currentLines.forEach((line, index) => {
+        lines.forEach((line, index) => {
             const highlightedLine = hljs.highlight(line || ' ', { language: 'python' }).value;
             newHtml += `<div style="height: 20px; line-height: 20px; white-space: pre; overflow: hidden;">${highlightedLine || ' '}</div>`;
 
@@ -488,15 +516,7 @@ function renderCode(content) {
         });
 
         codeContent.innerHTML = newHtml;
-        codeContent.scrollTop = scrollTop;
-        setCaretCharacterOffsetWithin(codeContent, offset);
-
-        // Ensure scroll sync is maintained
-        lineNumbers.scrollTop = codeContent.scrollTop;
-
-        // Autosave
-        debouncedSave();
-    };
+    }
 
     codeContent.onkeydown = (e) => {
         if (e.key === 'Tab') {
@@ -565,12 +585,50 @@ ipcRenderer.on('format-dedent', () => {
 });
 
 ipcRenderer.on('format-comment', () => {
-    document.execCommand('insertText', false, '# ');
+    const { start, end } = getSelectionOffsets(codeContent);
+    const text = codeContent.innerText;
+    const lines = text.split('\n');
+
+    let currentPos = 0;
+    const newLines = lines.map(line => {
+        const lineStart = currentPos;
+        const lineEnd = currentPos + line.length;
+        currentPos = lineEnd + 1; // +1 for \n
+
+        // If line intersects selection
+        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
+            return '##' + line;
+        }
+        return line;
+    });
+
+    renderLines(newLines);
+    setSelectionOffsets(codeContent, start + 2, end + (newLines.length * 2)); // Approximate restoration
+    debouncedSave();
 });
 
 ipcRenderer.on('format-uncomment', () => {
-    // Hard to do without selection context
-    alert('Uncomment not fully implemented.');
+    const { start, end } = getSelectionOffsets(codeContent);
+    const text = codeContent.innerText;
+    const lines = text.split('\n');
+
+    let currentPos = 0;
+    const newLines = lines.map(line => {
+        const lineStart = currentPos;
+        const lineEnd = currentPos + line.length;
+        currentPos = lineEnd + 1;
+
+        if ((lineStart >= start && lineStart < end) || (lineEnd > start && lineEnd <= end) || (start >= lineStart && end <= lineEnd)) {
+            if (line.startsWith('##')) return line.substring(2);
+            if (line.startsWith('# ')) return line.substring(2);
+            if (line.startsWith('#')) return line.substring(1);
+        }
+        return line;
+    });
+
+    renderLines(newLines);
+    setSelectionOffsets(codeContent, Math.max(0, start - 2), Math.max(0, end - 2));
+    debouncedSave();
 });
 
 ipcRenderer.on('format-tabify', () => {
