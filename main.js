@@ -562,6 +562,12 @@ ipcMain.on('session-create', (event, sessionId, filePath, name, force) => {
     });
 
     pyProcess.on('close', (code) => {
+        // Check if this process is still the active one for the session
+        // If we restarted, session.process has been updated to the new process
+        if (session.process && session.process !== pyProcess) {
+            return; // Ignore old process exit
+        }
+
         const entry = { type: 'meta', text: `\n[Process exited with code ${code}]\n` };
         session.history.push(entry);
         broadcastToSession(sessionId, 'session-exit', code);
