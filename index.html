@@ -109,6 +109,11 @@
         .v-resizer:hover, .v-resizer.dragging {
             background: rgba(0, 112, 243, 0.3);
         }
+        
+        body.is-dragging iframe,
+        body.is-dragging webview {
+            pointer-events: none !important;
+        }
     </style>
 </head>
 

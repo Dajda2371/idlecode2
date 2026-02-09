@@ -1800,6 +1800,7 @@ function setupResizer(resizerId, sidebarId, direction, inverse = false) {
     resizer.addEventListener('mousedown', (e) => {
         e.preventDefault();
         resizer.classList.add('dragging');
+        document.body.classList.add('is-dragging');
         document.body.style.cursor = direction === 'h' ? 'col-resize' : 'row-resize';
 
         startPos = direction === 'h' ? e.clientX : e.clientY;
@@ -1810,11 +1811,7 @@ function setupResizer(resizerId, sidebarId, direction, inverse = false) {
             let delta = currentPos - startPos;
             if (inverse) delta = -delta;
 
-            const newSize = startSize + delta;
-
-            // Min/Max constraints
-            const minSize = 50;
-            if (newSize < minSize) return;
+            const newSize = Math.max(50, startSize + delta);
 
             if (direction === 'h') {
                 sidebar.style.width = `${newSize}px`;
@@ -1825,6 +1822,7 @@ function setupResizer(resizerId, sidebarId, direction, inverse = false) {
 
         const onMouseUp = () => {
             resizer.classList.remove('dragging');
+            document.body.classList.remove('is-dragging');
             document.body.style.cursor = '';
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
