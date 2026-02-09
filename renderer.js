@@ -458,6 +458,13 @@ ipcRenderer.on('toggle-sidebars', () => {
 
     if (isExplorerVisible || isAgentVisible || isConsoleVisible) {
         // HIDE ALL
+        // Pop out shells
+        if (typeof consoles !== 'undefined' && Array.isArray(consoles)) {
+            consoles.forEach(c => {
+                ipcRenderer.send('pop-out-session', c.id, c.name || `Shell ${c.id}`);
+            });
+        }
+
         savedSidebarState = {
             explorer: isExplorerVisible,
             agent: isAgentVisible,
@@ -476,6 +483,8 @@ ipcRenderer.on('toggle-sidebars', () => {
         ipcRenderer.send('update-menu-checkbox', 'menu-view-console', false);
     } else {
         // RESTORE
+        ipcRenderer.send('close-popped-consoles');
+
         const showExplorer = savedSidebarState.explorer;
         const showAgent = savedSidebarState.agent;
         const showConsole = savedSidebarState.console;
