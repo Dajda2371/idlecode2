@@ -78,7 +78,10 @@ ipcRenderer.on('open-folder', (event, folderPath) => {
 });
 
 // View Transitions
+let isStartupState = true;
+
 function initializeLayout() {
+    isStartupState = true;
     // Create Default Shell and Pop Out
     if (typeof createConsole === 'function') {
         const defaultConsole = createConsole('Python Shell');
@@ -120,6 +123,15 @@ function initializeLayout() {
 function switchToEditorView() {
     // Show Main Window
     ipcRenderer.send('show-window');
+
+    // Kill startup shell if transitioning from startup state
+    if (isStartupState) {
+        isStartupState = false;
+        if (activeConsoleId) {
+            closeConsole(activeConsoleId);
+        }
+        ipcRenderer.send('close-popped-consoles');
+    }
 
     // Show Editor
     const editorArea = document.getElementById('editor-area');
@@ -586,15 +598,28 @@ ipcRenderer.on('toggle-console', (event, show) => {
     const consoleArea = document.getElementById('console-area');
     const consoleResizer = document.getElementById('console-v-resizer');
 
-    if (consoleArea) {
-        consoleArea.style.display = show ? 'flex' : 'none';
-        if (show) {
-            // Reset layout to safe defaults
+    if (show) {
+        // Toggle ON -> Pop Shells Back In
+        ipcRenderer.send('close-popped-consoles');
+
+        if (consoleArea) {
+            consoleArea.style.display = 'flex';
+            // Reset layout
             consoleArea.classList.remove('flex-1');
             consoleArea.classList.add('h-[250px]');
             consoleArea.style.height = '';
         }
+    } else {
+        // Toggle OFF -> Pop Shells OUT
+        if (typeof consoles !== 'undefined' && Array.isArray(consoles)) {
+            consoles.forEach(c => {
+                ipcRenderer.send('pop-out-session', c.id, c.name || `Shell ${c.id}`);
+            });
+        }
+
+        if (consoleArea) consoleArea.style.display = 'none';
     }
+
     if (consoleResizer) consoleResizer.style.display = show ? 'block' : 'none';
 
     // Update saved state
