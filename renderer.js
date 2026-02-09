@@ -434,6 +434,65 @@ ipcRenderer.on('toggle-ai-agent', (event, show) => {
     const resizer = document.getElementById('agent-resizer');
     if (el) el.style.display = show ? 'flex' : 'none';
     if (resizer) resizer.style.display = show ? 'block' : 'none';
+
+    // Layout update
+    if (window.monaco && window.monaco.editor) {
+        setTimeout(() => window.monaco.editor.getEditors().forEach(e => e.layout()), 50);
+    }
+});
+
+// Toggle Sidebars Logic
+let savedSidebarState = { explorer: true, agent: true };
+
+ipcRenderer.on('toggle-sidebars', () => {
+    const explorer = document.getElementById('explorer-sidebar');
+    const explorerResizer = document.getElementById('explorer-resizer');
+    const agent = document.getElementById('agent-sidebar');
+    const agentResizer = document.getElementById('agent-resizer');
+
+    const isExplorerVisible = explorer && explorer.style.display !== 'none';
+    const isAgentVisible = agent && agent.style.display !== 'none';
+
+    if (isExplorerVisible || isAgentVisible) {
+        // HIDE ALL
+        savedSidebarState = { explorer: isExplorerVisible, agent: isAgentVisible };
+
+        if (explorer) explorer.style.display = 'none';
+        if (explorerResizer) explorerResizer.style.display = 'none';
+        if (agent) agent.style.display = 'none';
+        if (agentResizer) agentResizer.style.display = 'none';
+
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', false);
+        ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', false);
+    } else {
+        // RESTORE
+        const showExplorer = savedSidebarState.explorer;
+        const showAgent = savedSidebarState.agent;
+
+        if (showExplorer) {
+            if (explorer) explorer.style.display = 'flex';
+            if (explorerResizer) explorerResizer.style.display = 'block';
+        }
+        if (showAgent) {
+            if (agent) agent.style.display = 'flex';
+            if (agentResizer) agentResizer.style.display = 'block';
+        }
+
+        // If saved state was both hidden, default to showing Explorer
+        if (!showExplorer && !showAgent) {
+            if (explorer) explorer.style.display = 'flex';
+            if (explorerResizer) explorerResizer.style.display = 'block';
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', true);
+        } else {
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-explorer', showExplorer);
+            ipcRenderer.send('update-menu-checkbox', 'menu-view-agent', showAgent);
+        }
+    }
+
+    // Trigger Monaco resize
+    if (window.monaco && window.monaco.editor) {
+        setTimeout(() => window.monaco.editor.getEditors().forEach(e => e.layout()), 50);
+    }
 });
 
 ipcRenderer.on('run-module', async () => {
