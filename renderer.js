@@ -876,7 +876,8 @@ ipcRenderer.on('session-output', (event, sessionId, entry) => {
 
     if (entry.type === 'input') {
         const promptText = entry.prompt || '>>>';
-        const html = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">${escapeHtml(promptText)}</span><span>${escapeHtml(entry.text)}</span></div>`;
+        const highlightedInput = hljs.highlight(entry.text, { language: 'python' }).value;
+        const html = `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">${escapeHtml(promptText)}</span><span>${highlightedInput}</span></div>`;
         consoleData.history += html;
         if (activeConsoleId === sessionId) {
             const div = document.createElement('div');
@@ -926,7 +927,8 @@ ipcRenderer.on('session-history', (event, sessionId, historyArr, cmdHistory, dra
     if (Array.isArray(historyArr)) {
         historyArr.forEach(entry => {
             if (entry.type === 'input') {
-                fullHtml += `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${escapeHtml(entry.text)}</span></div>`;
+                const highlightedInput = hljs.highlight(entry.text, { language: 'python' }).value;
+                fullHtml += `<div class="mt-1"><span class="text-[var(--idle-keyword)] font-bold mr-2">>>></span><span>${highlightedInput}</span></div>`;
             } else {
                 let colorClass = 'text-gray-800';
                 if (entry.type === 'stdout') colorClass = 'text-blue-600';
