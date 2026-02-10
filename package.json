@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "build:win": "electron-builder --win portable",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -24,5 +25,20 @@
   "dependencies": {
     "highlight.js": "^11.11.1",
     "monaco-editor": "^0.55.1"
+  },
+  "build": {
+    "appId": "com.dajda2371.idlecode2",
+    "productName": "IdleCode",
+    "win": {
+      "target": "portable"
+    },
+    "files": [
+      "**/*",
+      "!dist/*",
+      "!src/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
   }
 }
