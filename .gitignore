@@ -1,6 +1,8 @@
 node_modules
 package-lock.json
 
+ElectronWebViewer
+
 .DS_Store
 desktop.ini
 
