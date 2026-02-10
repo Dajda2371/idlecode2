@@ -2,6 +2,15 @@ const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process');
 
+function checkQuit() {
+    const wins = BrowserWindow.getAllWindows();
+    const anyVisible = wins.some(w => !w.isDestroyed() && w.isVisible());
+    if (!anyVisible) {
+        app.quit();
+    }
+}
+
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
@@ -14,6 +23,8 @@ function createWindow() {
     })
 
     win.loadFile('index.html')
+    win.on('closed', checkQuit);
+
 
     const template = [
         {
@@ -338,6 +349,7 @@ app.whenReady().then(() => {
 ipcMain.on('hide-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.hide();
+    checkQuit();
 });
 
 ipcMain.on('show-window', (event) => {
@@ -352,6 +364,19 @@ ipcMain.on('show-window', (event) => {
 app.on('window-all-closed', () => {
     app.quit()
 })
+
+app.on('before-quit', () => {
+    sessions.forEach(session => {
+        if (session.process) {
+            try {
+                session.process.kill();
+            } catch (e) {
+                console.error('Failed to kill python process:', e);
+            }
+        }
+    });
+});
+
 
 // --- Custom Console Logic ---
 // const { ipcMain } = require('electron'); // Removed duplicate
@@ -382,6 +407,7 @@ ipcMain.on('new-console-window', () => {
     subWin.on('closed', () => {
         const idx = poppedConsoles.indexOf(subWin);
         if (idx > -1) poppedConsoles.splice(idx, 1);
+        checkQuit();
     });
 });
 
@@ -691,6 +717,7 @@ ipcMain.on('pop-out-session', (event, sessionId, title) => {
         const idx = poppedConsoles.indexOf(subWin);
         if (idx > -1) poppedConsoles.splice(idx, 1);
         sessionWindows.delete(sessionId);
+        checkQuit();
     });
 });
 
