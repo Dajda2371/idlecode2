@@ -34,6 +34,14 @@
       "target": "portable",
       "forceCodeSigning": false
     },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development"
+    },
     "files": [
       "**/*",
       "!dist/*",
