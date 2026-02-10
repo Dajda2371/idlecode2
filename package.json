@@ -31,7 +31,8 @@
     "appId": "com.dajda2371.idlecode2",
     "productName": "IdleCode",
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "forceCodeSigning": false
     },
     "files": [
       "**/*",
