@@ -350,9 +350,7 @@ ipcMain.on('show-window', (event) => {
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit()
-    }
+    app.quit()
 })
 
 // --- Custom Console Logic ---
